@@ -38,19 +38,23 @@ export function StepTimeline({ steps }: { steps: Step[] }) {
       {steps.slice(0, visible).map((s, i) => (
         <li key={i} className="flex gap-3">
           <div className="flex flex-col items-center">
-            <span className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-sm shrink-0">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-sm shadow-sm">
               {ICONS[s.kind] ?? "•"}
             </span>
-            {i < visible - 1 && <span className="w-px flex-1 bg-slate-800 my-1" />}
+            {i < visible - 1 && <span className="my-1 w-px flex-1 bg-slate-200" />}
           </div>
-          <div className="pt-1 pb-2">
+          <div className="pb-2 pt-1">
             <div className="flex items-center gap-2">
-              <span className="mono text-[10px] uppercase tracking-wide text-slate-500">{s.kind}</span>
+              <span className="mono text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                {s.kind}
+              </span>
               {s.below_threshold === false && (
-                <span className="text-[10px] rounded-full bg-slate-700/60 px-2 py-0.5 text-slate-300">no action</span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                  no action
+                </span>
               )}
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">{s.message}</p>
+            <p className="mt-0.5 text-xs text-slate-600">{s.message}</p>
           </div>
         </li>
       ))}
