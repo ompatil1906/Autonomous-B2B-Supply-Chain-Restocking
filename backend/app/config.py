@@ -15,10 +15,11 @@ class Settings(BaseSettings):
     ap2_intent_expiry_hours: int = 24
 
     # Agent / LLM
-    agent_llm_provider: str = "mock"  # openai | anthropic | mock
-    agent_llm_model: str = "gpt-4o-mini"
+    agent_llm_provider: str = "mock"  # openai | anthropic | gemini | mock
+    agent_llm_model: str = "gemini/gemini-3.5-flash-lite"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
+    gemini_api_key: str = ""
 
     # Razorpay MCP
     razorpay_mode: str = "mock"  # remote | mock
@@ -54,6 +55,8 @@ class Settings(BaseSettings):
             return bool(self.openai_api_key)
         if self.agent_llm_provider == "anthropic":
             return bool(self.anthropic_api_key)
+        if self.agent_llm_provider == "gemini":
+            return bool(self.gemini_api_key)
         return False
 
 
