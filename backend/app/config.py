@@ -15,14 +15,14 @@ class Settings(BaseSettings):
     ap2_intent_expiry_hours: int = 24
 
     # Agent / LLM
-    agent_llm_provider: str = "mock"  # openai | anthropic | gemini | mock
+    agent_llm_provider: str = "gemini"  # openai | anthropic | gemini | mock
     agent_llm_model: str = "gemini/gemini-3.5-flash-lite"
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
 
     # Razorpay MCP
-    razorpay_mode: str = "mock"  # remote | mock
+    razorpay_mode: str = "remote"  # remote | mock
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     razorpay_mcp_token: str = ""
