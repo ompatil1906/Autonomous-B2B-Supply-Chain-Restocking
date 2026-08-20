@@ -30,57 +30,48 @@ class RazorpayMcpClient:
         self.backend = "mock" if self.use_mock else "remote-mcp"
         self._session = None
 
-    async def _remote_session(self):
-        if self._session is not None:
-            return self._session
-        from mcp import ClientSession
-        from mcp.client.streamable_http import streamablehttp_client
-
-        token = settings.razorpay_mcp_auth_token
-        if not token:
-            raise RazorpayToolError("No Razorpay credentials configured for remote MCP mode")
-        transport = streamablehttp_client(
-            settings.razorpay_mcp_url,
-            headers={"Authorization": f"Basic {token}", "Accept": "application/json, text/event-stream"},
-        )
-        read, write, _ = await transport.__aenter__()
-        session = ClientSession(read, write)
-        await session.__aenter__()
-        await session.initialize()
-        self._session = session
-        self._transport = transport
-        return session
-
-    async def _close_transport(self):
-        try:
-            if self._session:
-                await self._session.__aexit__(None, None, None)
-            if getattr(self, "_transport", None):
-                await self._transport.__aexit__(None, None, None)
-        except Exception:
-            pass
-        self._session = None
-
     async def _call(self, tool: str, arguments: dict) -> dict:
         """Call a tool on the remote MCP server and normalise the result to JSON."""
         try:
-            session = await self._remote_session()
-            result = await session.call_tool(tool, arguments)
-            if result.structuredContent:
-                data = result.structuredContent
-            else:
-                text = "".join(
-                    c.text for c in (result.content or []) if hasattr(c, "text") and c.text
-                )
-                data = json.loads(text) if text.strip() else {}
-            append("razorpay.tool", {"tool": tool, "arguments": arguments, "result": data})
-            return data
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamable_http_client
+            import httpx2
+
+            token = settings.razorpay_mcp_auth_token
+            if not token:
+                raise RazorpayToolError("No Razorpay credentials configured for remote MCP mode")
+
+            http_client = httpx2.AsyncClient(
+                headers={"Authorization": f"Basic {token}", "Accept": "application/json, text/event-stream"}
+            )
+            
+            async with streamable_http_client(settings.razorpay_mcp_url, http_client=http_client) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    result = await session.call_tool(tool, arguments)
+
+                    if getattr(result, "structuredContent", None):
+                        data = result.structuredContent
+                    else:
+                        text = "".join(
+                            c.text for c in (getattr(result, "content", []) or []) if hasattr(c, "text") and c.text
+                        )
+                        text_val = text.strip()
+                        if text_val:
+                            try:
+                                data = json.loads(text_val)
+                            except json.JSONDecodeError:
+                                data = {"text": text_val}
+                        else:
+                            data = {}
+                    
+                    append("razorpay.tool", {"tool": tool, "arguments": arguments, "result": data})
+                    return data
         except Exception as exc:
             log.warning("Remote MCP call %s failed (%s); falling back to simulator", tool, exc)
-            await self._close_transport()
             self.backend = "mock"
             self.use_mock = True
-            return await self._call_mock(tool, arguments)
+            return self._call_mock(tool, arguments)
 
     async def capture_payment(self, payment_id: str, amount_inr: float, currency: str = "INR") -> dict:
         args = {
