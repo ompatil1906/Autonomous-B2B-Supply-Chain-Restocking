@@ -105,10 +105,33 @@ built-in simulator** with the same tool contract — the demo never breaks.
 
 ## How the audit trail is generated
 
-`backend/app/audit.py` appends one JSON line per event: `reserve_pay.blocked`,
+`backend/app/audit.py` appends one hash-chained JSON line per event: `reserve_pay.blocked`,
 `agent.negotiated`, `agent.gate`, `razorpay.tool` (every MCP call + arguments + result),
-`agent.executed` / `agent.blocked`, `notification.sent`. The dashboard's *Audit trail*
-panel renders it live; the *Mandate chain* panel renders the three signed VCs.
+`agent.executed` / `agent.blocked`, `notification.sent`,
+`approval.requested` / `approval.granted` / `approval.rejected`.
+
+Every record carries `prev_hash` and `hash = SHA256(prev_hash + canonical_json(body))`
+(genesis `prev_hash = 0x00…00`), so editing any historical field breaks every hash after it.
+`GET /api/audit/verify` recomputes the whole chain server-side; the dashboard's *Verify chain*
+button calls it live during the demo.
+
+## Human-in-the-loop approvals
+
+When the gate blocks a purchase, `backend/app/services/approvals.py` registers a pending
+escalation (persisted to `backend/data/approvals.json`) and the merchant resolves it from the
+dashboard:
+
+- `GET  /api/approvals` — pending + resolved inbox
+- `POST /api/approvals/{id}/approve` — creates a **fresh** payment link via the Razorpay MCP
+  server at click time, marks the escalation approved, lands `approval.granted` in the ledger
+- `POST /api/approvals/{id}/reject` — refuses; nothing is ever charged
+
+The WhatsApp message is a notification only — authorization happens through the signed
+payment link, never by replying.
+
+Other endpoints: `/api/runs/latest` and `backend/data/last_run.json` persist the last run so a
+page refresh (or backend restart) keeps state; concurrent `/api/run` calls are serialized with
+an asyncio lock, making the no-double-spend guarantee demonstrable.
 
 ## Security notes
 

@@ -1,0 +1,132 @@
+[
+ {
+  "id": "appr_35c14e9b1d",
+  "status": "approved",
+  "sku": "SKU-404",
+  "quantity": 100,
+  "total_inr": 11000.0,
+  "ceiling_inr": 10000.0,
+  "over_by": 1000.0,
+  "quote_ref": "QT-E1624D80",
+  "reason": "gate_blocked_ceiling_exceeded",
+  "cart_mandate": {
+   "@context": [
+    "https://www.w3.org/ns/credentials/v2.0",
+    "https://ap2-protocol.org/contexts/mandate/v1"
+   ],
+   "id": "urn:uuid:516f66e9-d1d6-4971-ad7f-8e208d16de2e",
+   "type": [
+    "VerifiableCredential",
+    "AP2CartMandate"
+   ],
+   "vct": "mandate.cart.1",
+   "issuer": "did:ap2:AFbmbqRFxKXV7dGGGBSw2CeUyV9UCRNVcdaFTKWqcMrZ",
+   "issuanceDate": "2026-08-23T09:58:35+00:00",
+   "expirationDate": "2026-08-23T10:58:35+00:00",
+   "credentialSubject": {
+    "mandate_id": "2a29aa44-bcf0-40ab-a573-d11743644a04",
+    "prev_mandate_id": "urn:uuid:2f6d7742-56cd-408f-a4e2-5404080ad8f9",
+    "prev_mandate_ids": [
+     "urn:uuid:2f6d7742-56cd-408f-a4e2-5404080ad8f9"
+    ],
+    "timestamp": "2026-08-23T09:58:35+00:00",
+    "merchant_did": "did:ap2:AFbmbqRFxKXV7dGGGBSw2CeUyV9UCRNVcdaFTKWqcMrZ",
+    "supplier_name": "Acme B2B Supplies",
+    "items": [
+     {
+      "sku": "SKU-404",
+      "name": "Minimal Cotton Tee (Black)",
+      "quantity": 100,
+      "unit_price_inr": 110.0,
+      "line_total_inr": 11000.0
+     }
+    ],
+    "taxes_inr": 0.0,
+    "shipping_inr": 0.0,
+    "total_inr": 11000.0,
+    "currency": "INR",
+    "quote_ref": "QT-E1624D80"
+   },
+   "proof": {
+    "type": "Ed25519Signature2020",
+    "created": "2026-08-23T09:58:35+00:00",
+    "verificationMethod": "did:ap2:AFbmbqRFxKXV7dGGGBSw2CeUyV9UCRNVcdaFTKWqcMrZ#supplier",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "39vekSkyzdxfqVNbWcrFbhdBLSmE76AHXVMxLSoi4CzsS9FPTSyuca74n3VnAYrJig1VkhfxTffHaRjGk28KKsB"
+   }
+  },
+  "payment_link": {
+   "accept_partial": false,
+   "allow_full_payment": false,
+   "amount": 1100000,
+   "amount_paid": 0,
+   "cancelled_at": 0,
+   "created_at": 1787479116,
+   "currency": "INR",
+   "customer": [],
+   "description": "Supplier price-hike override — Acme B2B Supplies QT-E1624D80",
+   "expire_by": 0,
+   "expired_at": 0,
+   "first_min_partial_amount": 0,
+   "id": "plink_TTAbS5txjsmtnD",
+   "notes": {
+    "cart_mandate_id": "urn:uuid:516f66e9-d1d6-4971-ad7f-8e208d16de2e",
+    "sku": "SKU-404"
+   },
+   "notify": {
+    "email": false,
+    "sms": false,
+    "whatsapp": false
+   },
+   "payment_plan": false,
+   "payments": null,
+   "reference_id": "OVR-QT-E1624D80",
+   "reminder_enable": false,
+   "reminders": [],
+   "short_url": "https://rzp.io/rzp/wRj1v6Fp",
+   "status": "created",
+   "updated_at": 1787479116,
+   "upi_link": false,
+   "user_id": "",
+   "whatsapp_link": false
+  },
+  "created_at": "2026-08-23T09:58:36+00:00",
+  "resolved_at": "2026-08-23T09:58:47+00:00",
+  "resolved_link": {
+   "accept_partial": false,
+   "allow_full_payment": false,
+   "amount": 1100000,
+   "amount_paid": 0,
+   "cancelled_at": 0,
+   "created_at": 1787479116,
+   "currency": "INR",
+   "customer": [],
+   "description": "Supplier price-hike override — Acme B2B Supplies QT-E1624D80",
+   "expire_by": 0,
+   "expired_at": 0,
+   "first_min_partial_amount": 0,
+   "id": "plink_TTAbS5txjsmtnD",
+   "notes": {
+    "cart_mandate_id": "urn:uuid:516f66e9-d1d6-4971-ad7f-8e208d16de2e",
+    "sku": "SKU-404"
+   },
+   "notify": {
+    "email": false,
+    "sms": false,
+    "whatsapp": false
+   },
+   "payment_plan": false,
+   "payments": null,
+   "reference_id": "OVR-QT-E1624D80",
+   "reminder_enable": false,
+   "reminders": [],
+   "short_url": "https://rzp.io/rzp/wRj1v6Fp",
+   "status": "created",
+   "updated_at": 1787479116,
+   "upi_link": false,
+   "user_id": "",
+   "whatsapp_link": false
+  },
+  "link_reused": true
+ }
+]

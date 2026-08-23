@@ -41,7 +41,7 @@ export function Console({ steps, revealed }: { steps: Step[]; revealed: number }
           >
             <div
               className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-              style={{ background: C.surfaceRaised, border: `1px solid ${C.hair}` }}
+              style={{ background: C.raised, border: `1px solid ${C.hair}` }}
             >
               <IconFinal size={13} color={tone} />
             </div>

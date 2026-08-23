@@ -25,9 +25,9 @@ export function MandateSeal({
     status === "signed" ? "Sealed" : status === "void" ? "Void" : "Pending";
   const borderColor =
     status === "signed"
-      ? "rgba(201,161,92,0.3)"
+      ? "rgba(168,127,61,0.35)"
       : status === "void"
-        ? "rgba(229,88,79,0.3)"
+        ? "rgba(222,76,74,0.35)"
         : C.hair;
 
   // Real cryptographic proof value from the signed VC.
@@ -87,7 +87,7 @@ export function MandateSeal({
             />
           </button>
           {open && (
-            <pre className="json-view mt-2 max-h-64 overflow-auto rounded-lg p-2" style={{ background: C.surfaceRaised }}>
+            <pre className="json-view mt-2 max-h-64 overflow-auto rounded-lg p-2" style={{ background: C.raised }}>
               {JSON.stringify(mandate, null, 2)}
             </pre>
           )}

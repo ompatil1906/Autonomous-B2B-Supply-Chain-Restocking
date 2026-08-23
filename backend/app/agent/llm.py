@@ -32,6 +32,9 @@ NEGOTIATION RULES:
 
 Respond with STRICT JSON only:
 {"quantity": <int>, "reasoning": "<one short sentence>"}
+
+Sampling guidance: be fully deterministic — always output the single most likely
+answer, with zero variation between runs.
 """
 
 
@@ -69,7 +72,7 @@ def negotiate_quantity(
 
             import litellm
 
-            resp = litellm.completion(
+            kwargs = dict(
                 model=settings.agent_llm_model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -81,9 +84,13 @@ def negotiate_quantity(
                     },
                 ],
                 response_format={"type": "json_object"},
-                temperature=0,
                 timeout=30,
             )
+            # Gemini 3+ removed temperature/top_p/top_k — guidance lives in the
+            # system prompt instead. Other providers still get temperature=0.
+            if "gemini-3" not in settings.agent_llm_model:
+                kwargs["temperature"] = 0
+            resp = litellm.completion(**kwargs)
             payload = json.loads(resp.choices[0].message.content)
             return Negotiation(int(payload["quantity"]), payload["reasoning"], settings.agent_llm_provider)
         except Exception as exc:  # fall back to deterministic

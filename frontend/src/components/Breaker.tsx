@@ -25,7 +25,7 @@ export function Breaker({
 
       <div
         className="relative rounded-full mb-4"
-        style={{ width: 56, height: 150, background: C.surfaceRaised, border: `1px solid ${C.hair}` }}
+        style={{ width: 56, height: 150, background: C.raised, border: `1px solid ${C.hair}` }}
       >
         <div
           className="absolute left-1/2 rounded-full transition-all duration-700 ease-out"
@@ -59,7 +59,7 @@ export function Breaker({
           <span>Rs.0</span>
           <span>Ceiling {inr(ceiling)}</span>
         </div>
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: C.surfaceRaised }}>
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: C.raised }}>
           <div
             className="h-full rounded-full transition-all duration-700"
             style={{

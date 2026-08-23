@@ -76,22 +76,50 @@ export interface RunResult {
   payment_mandate: Mandate;
   capture_result?: CaptureResult;
   payment_link?: PaymentLink;
+  escalation_id?: string;
   whatsapp_message?: { to: string; message: string; payment_link?: string };
   reserve_block: ReserveBlock;
   stock_after: Record<string, number>;
   steps: Step[];
 }
 
-export interface Inventory {
-  catalog: { sku: string; name: string; stock: number; reorder_threshold: number }[];
-  stock: Record<string, number>;
-}
-
 export interface AuditRecord {
   seq: number;
   ts: string;
   kind: string;
+  prev_hash?: string;
+  hash?: string;
   [key: string]: any;
+}
+
+export interface ApprovalRecord {
+  id: string;
+  status: "pending" | "approved" | "rejected";
+  sku: string;
+  quantity: number;
+  total_inr: number;
+  ceiling_inr: number;
+  over_by: number;
+  quote_ref: string;
+  reason: string;
+  cart_mandate: any;
+  payment_link: PaymentLink | null;
+  created_at: string;
+  resolved_at: string | null;
+  resolved_link: PaymentLink | null;
+  link_reused?: boolean;
+  reject_note?: string;
+}
+
+export interface VerifyResult {
+  valid: boolean;
+  count: number;
+  first_bad_seq: number | null;
+}
+
+export interface Inventory {
+  catalog: { sku: string; name: string; stock: number; reorder_threshold: number }[];
+  stock: Record<string, number>;
 }
 
 export interface SystemStatus {
@@ -113,4 +141,5 @@ export type WsEvent =
   | { type: "run_started"; scenario: string }
   | { type: "node"; node: string; scenario: string; update: any }
   | { type: "run_completed"; scenario: string; result: RunResult }
-  | { type: "run_failed"; scenario: string; error: string };
+  | { type: "run_failed"; scenario: string; error: string }
+  | { type: "approval_updated" };

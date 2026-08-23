@@ -19,7 +19,7 @@ from app.ap2.signer import issue_intent_mandate, issue_payment_mandate, mandate_
 from app.config import settings
 from app.audit import append
 from app.models.mandates import CartMandate, IntentMandate, PaymentMandate
-from app.services import notifications, reserve_pay, supplier, warehouse
+from app.services import approvals, notifications, reserve_pay, supplier, warehouse
 from app.services.razorpay_mcp import RazorpayMcpClient
 
 
@@ -36,6 +36,7 @@ class AgentState(TypedDict, total=False):
     payment_mandate: PaymentMandate | None
     capture_result: dict | None
     payment_link: dict | None
+    escalation_id: str | None
     whatsapp_message: dict | None
     status: str
     summary: dict | None
@@ -158,7 +159,11 @@ async def node_execute(state: AgentState) -> dict:
     auth_payment = reserve_pay.synthetic_authorized_payment(block, amount)
     payment_id = settings.razorpay_authorized_payment_id or auth_payment["id"]
 
-    client = RazorpayMcpClient()
+    # A synthetic block id can never exist on the real sandbox — capture it with
+    # the deterministic simulator instead of burning a doomed remote MCP call.
+    client = RazorpayMcpClient(
+        force_mock=False if settings.razorpay_authorized_payment_id else True
+    )
     capture = await client.capture_payment(payment_id, amount)
 
     block = reserve_pay.debit(block, amount, capture)
@@ -225,10 +230,24 @@ async def node_escalate(state: AgentState) -> dict:
         prev_mandate_id=cart.id,
         status="aborted",
     )
+
+    # Register the escalation in the merchant's approval inbox (persisted).
+    esc = approvals.register(
+        sku=state["sku"],
+        quantity=state["quantity"],
+        total_inr=amount,
+        ceiling_inr=settings.ap2_mandate_limit_inr,
+        cart_mandate=mandate_to_json(cart),
+        quote_ref=cart.credentialSubject.quote_ref,
+        reason="gate_blocked_ceiling_exceeded",
+        payment_link=link,
+    )
+
     append("agent.blocked", {"sku": state["sku"], "amount_inr": amount, "payment_link_id": link.get("id")})
     return {
         "payment_mandate": pm,
         "payment_link": link,
+        "escalation_id": esc["id"],
         "whatsapp_message": sent,
         "status": "blocked",
         "steps": _step(
@@ -239,6 +258,7 @@ async def node_escalate(state: AgentState) -> dict:
             amount_inr=amount,
             razorpay_backend=client.backend,
             payment_link=link,
+            escalation_id=esc["id"],
             whatsapp_message=sent,
             payment_mandate=mandate_to_json(pm),
         ),
@@ -257,6 +277,7 @@ async def node_finish(state: AgentState) -> dict:
         "payment_mandate": mandate_to_json(state["payment_mandate"]),
         "capture_result": state.get("capture_result"),
         "payment_link": state.get("payment_link"),
+        "escalation_id": state.get("escalation_id"),
         "whatsapp_message": state.get("whatsapp_message"),
         "reserve_block": reserve_pay.to_dict(state["reserve_block"]),
         "stock_after": warehouse.stock_levels(),
