@@ -8,6 +8,7 @@ so the demo never breaks, even with no keys or no network.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import uuid
@@ -22,16 +23,33 @@ class RazorpayToolError(RuntimeError):
     pass
 
 
+# Minimum fields a *successful* tool payload must contain. The remote server
+# sometimes answers with prose/error objects (e.g. capturing a synthetic
+# payment id that does not exist on the sandbox); those must be treated as
+# failures so we fall back to the deterministic simulator.
+_MIN_SHAPE: dict[str, tuple[str, ...]] = {
+    "capture_payment": ("id",),
+    "create_payment_link": ("id", "short_url"),
+    "send_payment_link": ("status",),
+    "fetch_payment": ("id",),
+}
+
+
 class RazorpayMcpClient:
     """Unified facade over the real MCP server or the built-in simulator."""
 
     def __init__(self, *, force_mock: bool | None = None):
         self.use_mock = force_mock if force_mock is not None else (settings.razorpay_mode != "remote")
         self.backend = "mock" if self.use_mock else "remote-mcp"
-        self._session = None
 
     async def _call(self, tool: str, arguments: dict) -> dict:
-        """Call a tool on the remote MCP server and normalise the result to JSON."""
+        """Call a tool on the remote MCP server and normalise the result to JSON.
+
+        The MCP SDK uses anyio TaskGroups internally, which are incompatible with
+        FastAPI/uvicorn's asyncio event loop when nested. The fix is to run the
+        entire MCP session in a dedicated thread with a fresh asyncio.run() loop,
+        completely isolated from uvicorn's event loop.
+        """
         try:
             from mcp import ClientSession
             from mcp.client.streamable_http import streamable_http_client
@@ -41,34 +59,58 @@ class RazorpayMcpClient:
             if not token:
                 raise RazorpayToolError("No Razorpay credentials configured for remote MCP mode")
 
-            http_client = httpx2.AsyncClient(
-                headers={"Authorization": f"Basic {token}", "Accept": "application/json, text/event-stream"}
-            )
-            
-            async with streamable_http_client(settings.razorpay_mcp_url, http_client=http_client) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    result = await session.call_tool(tool, arguments)
+            mcp_url = settings.razorpay_mcp_url
+            auth_headers = {
+                "Authorization": f"Basic {token}",
+                "Accept": "application/json, text/event-stream",
+            }
 
-                    if getattr(result, "structuredContent", None):
-                        data = result.structuredContent
-                    else:
-                        text = "".join(
-                            c.text for c in (getattr(result, "content", []) or []) if hasattr(c, "text") and c.text
-                        )
-                        text_val = text.strip()
-                        if text_val:
-                            try:
-                                data = json.loads(text_val)
-                            except json.JSONDecodeError:
-                                data = {"text": text_val}
-                        else:
-                            data = {}
-                    
-                    append("razorpay.tool", {"tool": tool, "arguments": arguments, "result": data})
-                    return data
+            def _run_in_thread() -> dict:
+                async def _inner():
+                    http_client = httpx2.AsyncClient(headers=auth_headers)
+                    async with streamable_http_client(mcp_url, http_client=http_client) as (read, write):
+                        async with ClientSession(read, write) as session:
+                            await session.initialize()
+                            result = await session.call_tool(tool, arguments)
+
+                            if getattr(result, "structuredContent", None):
+                                return result.structuredContent
+
+                            text = "".join(
+                                c.text for c in (getattr(result, "content", []) or [])
+                                if hasattr(c, "text") and c.text
+                            )
+                            text_val = text.strip()
+                            if text_val:
+                                try:
+                                    return json.loads(text_val)
+                                except json.JSONDecodeError:
+                                    return {"text": text_val}
+                            return {}
+
+                return asyncio.run(_inner())
+
+            loop = asyncio.get_event_loop()
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                data = await loop.run_in_executor(pool, _run_in_thread)
+
+            if not isinstance(data, dict):
+                raise RazorpayToolError(f"Unexpected MCP payload for {tool}: {data!r}")
+            missing = [k for k in _MIN_SHAPE.get(tool, ()) if k not in data]
+            if missing or "error" in data:
+                raise RazorpayToolError(
+                    f"Remote MCP {tool} failed or returned malformed payload "
+                    f"(missing {missing}): {str(data)[:200]}"
+                )
+
+            append("razorpay.tool", {"tool": tool, "arguments": arguments, "result": data})
+            return data
         except Exception as exc:
             log.warning("Remote MCP call %s failed (%s); falling back to simulator", tool, exc)
+            append(
+                "razorpay.tool_fallback",
+                {"tool": tool, "arguments": arguments, "remote_error": str(exc)[:200]},
+            )
             self.backend = "mock"
             self.use_mock = True
             return self._call_mock(tool, arguments)

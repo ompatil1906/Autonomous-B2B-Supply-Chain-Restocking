@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     # Notifications
     notify_channel: str = "console"  # console | webhook
     notify_webhook_url: str = ""
-    merchant_phone: str = "+919000000000"
+    merchant_phone: str = "+917436083790"
     supplier_name: str = "Acme B2B Supplies"
     merchant_name: str = "Acme D2C Store"
 

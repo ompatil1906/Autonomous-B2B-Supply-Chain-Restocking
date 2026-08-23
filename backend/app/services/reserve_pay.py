@@ -76,12 +76,16 @@ def debit(block: ReserveBlock, amount_inr: float, payment: dict) -> ReserveBlock
             raise ValueError(
                 f"Debit ₹{amount_inr:,.2f} exceeds reserve balance ₹{block.remaining_inr:,.2f}"
             )
+        payment_id = (
+            payment.get("id")
+            or f"unattributed_{uuid.uuid4().hex[:10]}"
+        )
         block.remaining_inr = round(block.remaining_inr - amount_inr, 2)
         block.debits.append(
             {
                 "ts": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 "amount_inr": amount_inr,
-                "payment_id": payment["id"],
+                "payment_id": payment_id,
             }
         )
         append(
@@ -90,7 +94,7 @@ def debit(block: ReserveBlock, amount_inr: float, payment: dict) -> ReserveBlock
                 "block_id": block.block_id,
                 "amount_inr": amount_inr,
                 "remaining_inr": block.remaining_inr,
-                "payment_id": payment["id"],
+                "payment_id": payment_id,
             },
         )
         return block

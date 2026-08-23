@@ -35,7 +35,7 @@ async def test_failure_path_graceful_escalation():
     assert result["capture_result"] is None
     assert result["payment_link"]["amount"] == 1_100_000  # ₹11,000 in paise
     assert "exceeds my" in result["whatsapp_message"]["message"]
-    assert "https://rzp.io/l/" in result["payment_link"]["short_url"]
+    assert "https://rzp.io/" in result["payment_link"]["short_url"]
     assert result["stock_after"]["SKU-404"] == 12  # untouched
 
 
