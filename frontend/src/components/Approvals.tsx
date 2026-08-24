@@ -36,7 +36,7 @@ function LinkButton({ link, onActivate }: { link?: PaymentLink | null; onActivat
   );
 }
 
-export function Approvals({ reloadKey }: { reloadKey: number }) {
+export function Approvals({ reloadKey, names }: { reloadKey: number; names?: Record<string, string> }) {
   const [pending, setPending] = useState<ApprovalRecord[]>([]);
   const [resolved, setResolved] = useState<ApprovalRecord[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -90,6 +90,27 @@ export function Approvals({ reloadKey }: { reloadKey: number }) {
     }
   };
 
+  const reasonChip = (p: ApprovalRecord) => {
+    if (p.reason === "daily_portfolio_cap_exceeded") {
+      // Not an error — the shared daily pool is fully committed and the agent
+      // correctly refused to keep spending. Brass, not red.
+      return (
+        <span
+          className="ml-2 px-1.5 py-0.5 rounded mono"
+          title={`Every purchase draws from one shared daily block. It is committed for today, so this ${inr(p.total_inr)} reorder waits for you.`}
+          style={{ background: C.brassDim, color: C.brass, fontSize: 11 }}
+        >
+          day's ₹1L pool committed
+        </span>
+      );
+    }
+    return (
+      <span className="ml-2 px-1.5 py-0.5 rounded mono" style={{ background: C.redDim, color: C.red, fontSize: 11 }}>
+        +{inr(p.over_by)} over order cap
+      </span>
+    );
+  };
+
   return (
     <div className="max-w-4xl mx-auto pt-2 space-y-6">
       <div>
@@ -100,8 +121,8 @@ export function Approvals({ reloadKey }: { reloadKey: number }) {
           </span>
         </div>
         <div className="text-xs" style={{ color: C.textLo }}>
-          Purchases the agent refused to make on its own. Approval happens here — through a signed
-          Razorpay link — never by replying to a message.
+          Purchases the agent refused to make on its own — across every SKU it manages. Approval
+          happens here, through a signed Razorpay link — never by replying to a message.
         </div>
       </div>
 
@@ -111,16 +132,27 @@ export function Approvals({ reloadKey }: { reloadKey: number }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {pending.map((p) => (
-            <div key={p.id} className="rounded-xl p-4" style={{ background: C.surface, border: `1px solid ${C.hair}` }}>
+          {pending.map((p) => {
+            const capCase = p.reason === "daily_portfolio_cap_exceeded";
+            return (
+            <div
+              key={p.id}
+              className="rounded-xl p-4"
+              style={{
+                background: C.surface,
+                border: `1px solid ${C.hair}`,
+                borderLeft: `3px solid ${capCase ? C.brass : C.red}`,
+              }}
+            >
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-sm" style={{ color: C.textHi }}>
                   <span className="mono font-medium">{p.sku}</span>
+                  {names?.[p.sku] && (
+                    <span style={{ color: C.textLo }}> · {names[p.sku]}</span>
+                  )}
                   <span style={{ color: C.textLo }}> × {p.quantity} units · </span>
                   <span className="mono">{inr(p.total_inr)}</span>
-                  <span className="ml-2 px-1.5 py-0.5 rounded mono" style={{ background: C.redDim, color: C.red, fontSize: 11 }}>
-                    +{inr(p.over_by)} over ceiling
-                  </span>
+                  {reasonChip(p)}
                 </div>
                 {/* The real Razorpay link IS the approval — one click opens
                     checkout and resolves the escalation. */}
@@ -173,7 +205,8 @@ export function Approvals({ reloadKey }: { reloadKey: number }) {
                 </div>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -193,6 +226,7 @@ export function Approvals({ reloadKey }: { reloadKey: number }) {
               <div key={p.id} className="rounded-lg p-3 flex items-center justify-between gap-3 text-xs" style={{ background: C.raised, border: `1px solid ${C.hair}` }}>
                 <span style={{ color: C.textHi }}>
                   <span className="mono mr-2">{p.sku}</span>
+                  {names?.[p.sku] && <span className="mr-2" style={{ color: C.textLo }}>{names[p.sku]} ·</span>}
                   {inr(p.total_inr)} · {p.quantity} units
                 </span>
                 <span className="flex items-center gap-3">

@@ -16,7 +16,8 @@ import os
 import threading
 from datetime import datetime, timezone
 
-AUDIT_FILE = "backend/data/audit.jsonl"
+from app.paths import AUDIT_FILE
+
 GENESIS = "0" * 64
 
 _lock = threading.Lock()

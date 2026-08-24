@@ -4,10 +4,49 @@ An autonomous B2B supply-chain purchasing agent that eliminates revenue loss fro
 high-velocity stockouts while enforcing a **strict cryptographic financial boundary**,
 built for the Razorpay Buildathon (Track 01: explainable, bounded, gated).
 
-- **UPI Reserve Pay** — the merchant blocks ₹10,000 in their account once (single PIN).
+- **UPI Reserve Pay** — the merchant blocks funds in their account once (single PIN).
 - **Google AP2 (Agent Payments Protocol)** — a tamper-proof chain of three signed mandates.
 - **Razorpay MCP Server** — `capture_payment` for autonomous debit, `create_payment_link`
   for the human-in-the-loop fallback.
+
+## Warden Live — the real-time showpiece (default tab)
+
+The **Live Ops** screen is a two-panel, event-sourced dashboard:
+
+- **Left — Shop Floor**: every SKU's live stock draining in real time, heat-scaled
+  velocity badges (`🔥 n/min`), predicted time-to-stockout countdowns, and a
+  Festival Drop rail for just-launched products.
+- **Right — Agent Ops**: a portfolio-level daily budget breaker (₹40,000/day across
+  ALL SKUs), a live feed of agent triggers with mandate-chain expansion and inline
+  escalations, plus a hash-chained ledger tail.
+
+### The predictive trigger engine
+
+Instead of a static threshold, `backend/app/services/velocity_engine.py` keeps a
+30-second sliding window of sales per SKU and computes
+`predicted_seconds_to_stockout = stock / units_per_minute * 60`. A trigger fires when
+the prediction enters the agent's **90-second lead time** (`predictive_velocity`) or
+stock hits the hard floor of 3 units as a safety net. Hysteresis guarantees one
+pipeline per SKU plus a 60s cooldown — no duplicate triggers while restocking.
+
+### Festival Mode (demo simulator)
+
+`POST /api/festival/start` schedules three product drops with tuned demand curves,
+simulating at the **event-source layer only** — velocity math, triggers, mandate
+chain and ledger downstream are all real:
+
+| SKU | Behaviour |
+| --- | --- |
+| SKU-F1 Festive Kurta | ramps to ~60/min → predictive trigger fires at ~45% stock; agent wins the race |
+| SKU-F2 Gift Hamper | comfortable mid-seller → normal autonomous execution |
+| SKU-F3 Tea-lights   | late 100/min spike forces back-to-back restock cycles — agent always wins the race, stock never reaches zero |
+
+Agent runs in Live Ops are **staged** (~6s per node) so the race between countdown
+and purchase is visible on stage. Concurrent runs reserve their estimated cart cost
+at trigger time, so two simultaneous restocks can never jointly slip past the daily
+ceiling — overcommitment is refused by the gate's `daily_portfolio_cap` check and
+escalated with an approval link, exactly like a per-SKU breach.
+
 
 ## The three-mandate evidence chain
 

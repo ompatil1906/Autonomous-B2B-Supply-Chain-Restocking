@@ -1,7 +1,9 @@
 import type {
+  AgentTrigger,
   ApprovalRecord,
   AuditRecord,
   Inventory,
+  LiveState,
   RunResult,
   SystemStatus,
   VerifyResult,
@@ -32,6 +34,15 @@ export const api = {
   approveApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/approve`),
   rejectApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/reject`),
   latest: () => get<{ latest: RunResult | null }>("/api/runs/latest"),
+  liveState: () => get<LiveState>("/api/live/state"),
+  festivalStart: (delayS: number) =>
+    fetch("/api/festival/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ delay_s: delayS }),
+    }).then((r) => r.json() as Promise<{ dropAtMs: number; skus: string[] }>),
+  festivalStop: () => post<{ stopped: boolean }>("/api/festival/stop"),
+  probe: (sku: string) => post<AgentTrigger>(`/api/live/probe/${sku}`),
   run: (body: {
     scenario: string;
     sku?: string;

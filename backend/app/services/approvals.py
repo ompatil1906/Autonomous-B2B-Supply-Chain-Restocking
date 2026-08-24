@@ -15,8 +15,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.audit import append
-
-APPROVALS_FILE = "backend/data/approvals.json"
+from app.paths import APPROVALS_FILE
 
 _lock = threading.Lock()
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  CheckCircle2, Link2, Lock, MessageCircle, PlayCircle,
-  Radio, ShieldAlert,
+  CheckCircle2, FlaskConical, Link2, Lock, MessageCircle, PlayCircle,
+  Radio, Rocket, ShieldAlert, Square,
 } from "lucide-react";
-import { api, connectWs } from "./lib/api";
+import { api } from "./lib/api";
 import type {
-  ApprovalRecord, AuditRecord, Inventory, RunResult, SystemStatus, WsEvent,
+  ApprovalRecord, AuditRecord, Inventory, RunResult, SystemStatus,
 } from "./lib/types";
 import { C, inr } from "./lib/theme";
 import { Breaker } from "./components/Breaker";
@@ -15,11 +15,13 @@ import { Overview } from "./components/Overview";
 import { Approvals } from "./components/Approvals";
 import { LedgerTable } from "./components/LedgerTable";
 import { ConfigureTab } from "./components/ConfigureTab";
+import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
+import { useLive } from "./hooks/useLive";
 
-type Tab = "overview" | "mission" | "approvals" | "ledger" | "configure";
+type Tab = "live" | "overview" | "mission" | "approvals" | "ledger" | "configure";
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("live");
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [inventory, setInventory] = useState<Inventory | null>(null);
   const [reserveRemaining, setReserveRemaining] = useState<number | null>(null);
@@ -56,16 +58,23 @@ export default function App() {
     }
   }, []);
 
+  // one socket feeds everything — Live Ops model + mission console + approvals badge
+  const handleWsEvent = useCallback(
+    (e: any) => {
+      if (e.type === "node") setLiveNode(e.node);
+      if (e.type === "approval_updated" || e.type === "run_completed") refresh().catch(console.error);
+    },
+    [refresh],
+  );
+
+  const live = useLive(handleWsEvent);
+
   useEffect(() => {
     refresh().catch(console.error);
     api
       .latest()
       .then((r) => r.latest && setResult(r.latest))
       .catch(() => {});
-    const close = connectWs((e: WsEvent) => {
-      if (e.type === "node") setLiveNode(e.node);
-      if (e.type === "approval_updated" || e.type === "run_completed") refresh().catch(console.error);
-    });
     const check = setInterval(() => {
       fetch("/api/health")
         .then(() => setWsState("open"))
@@ -74,10 +83,7 @@ export default function App() {
     fetch("/api/health")
       .then(() => setWsState("open"))
       .catch(() => setWsState("closed"));
-    return () => {
-      close();
-      clearInterval(check);
-    };
+    return () => clearInterval(check);
   }, [refresh]);
 
   // Reveal console steps with slightly irregular, human-feeling delays.
@@ -140,13 +146,13 @@ export default function App() {
   const failed = result?.status === "blocked";
   const complete = !!result && revealed >= steps.length - 1;
 
-  const lowStock = inventory?.catalog.find((s) => s.stock < s.reorder_threshold);
-  const saves = audit.filter((r) => r.kind === "agent.executed").length;
+  const lowStocks = inventory?.catalog.filter((s) => s.stock < s.reorder_threshold) ?? [];
 
   const pillTone =
     wsState === "open" ? C.green : wsState === "connecting" ? C.amber : C.red;
 
   const tabs: [Tab, string][] = [
+    ["live", "Live Ops"],
     ["overview", "Overview"],
     ["mission", "Mission control"],
     ["approvals", "Approvals"],
@@ -178,6 +184,7 @@ export default function App() {
             <Radio size={12} className={wsState === "open" ? "animate-pulse" : ""} />
             {wsState === "open" ? "LIVE · test mode" : wsState === "connecting" ? "CONNECTING" : "BACKEND OFFLINE"}
           </span>
+          <DemoControls live={live} />
           <div className="flex gap-1 p-1 rounded-lg flex-wrap" style={{ background: C.raised }}>
             {tabs.map(([key, label]) => (
               <button
@@ -210,13 +217,21 @@ export default function App() {
       </div>
 
       <div className="max-w-[1400px] mx-auto">
+        {tab === "live" && (
+          <LiveOpsScreen
+            live={live}
+            audit={audit}
+            onOpenLedger={() => setTab("ledger")}
+            onApprovalsChanged={() => refresh().catch(console.error)}
+          />        )}
+
         {tab === "overview" && (
           <Overview
             status={status}
             inventory={inventory}
             audit={audit}
             pendingCount={pendingCount}
-            saves={saves}
+            spentToday={live.budget.spentRupees}
             onOpenMission={() => setTab("mission")}
             onOpenApprovals={() => setTab("approvals")}
           />
@@ -230,9 +245,11 @@ export default function App() {
             >
               <div className="flex items-center gap-2 text-sm" style={{ color: C.textHi }}>
                 <ShieldAlert size={16} color={C.brass} />
-                {lowStock
-                  ? `Low-stock trigger: ${lowStock.sku} "${lowStock.name}" — ${lowStock.stock} units on hand (threshold ${lowStock.reorder_threshold})`
-                  : "Warehouse nominal — no restock triggers"}
+                {lowStocks.length
+                  ? `Low-stock triggers: ${lowStocks
+                      .map((s) => `${s.sku} (${s.stock} left, threshold ${s.reorder_threshold})`)
+                      .join(" · ")}`
+                  : `Warehouse nominal across all ${inventory?.catalog.length ?? 0} SKUs — no restock triggers`}
               </div>
               <div className="flex gap-2 flex-wrap">
                 <ScenarioBtn label="Run: normal restock" tone={C.green} dim={C.greenDim} onClick={() => run("happy")} disabled={running} />
@@ -248,7 +265,7 @@ export default function App() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_280px] gap-4">
-              <Breaker state={breakerState} cart={cartTotal} ceiling={ceiling} />
+                <Breaker state={breakerState} cart={cartTotal} ceiling={ceiling} dailyCeiling={status?.ap2_daily_ceiling_inr} />
 
               <div
                 className="rounded-2xl p-5"
@@ -318,7 +335,7 @@ export default function App() {
                     ["SKU", status?.ap2_sku ?? "—"],
                     ["Max qty", `${status?.ap2_max_qty ?? "—"} units`],
                     ["Max unit price", inr(status?.ap2_max_unit_price)],
-                    ["Ceiling", inr(ceiling)],
+                    ["Order cap", inr(ceiling)],
                   ]}
                 />
                 <MandateSeal
@@ -350,7 +367,7 @@ export default function App() {
                             ["Ref", result.capture_result?.id?.slice(0, 18) ?? "—"],
                           ]
                         : [
-                            ["Reason", "Ceiling exceeded"],
+                            ["Reason", "Order cap exceeded"],
                             ["Funds moved", "None"],
                           ]
                       : [["Awaiting", "boundary check"]]
@@ -369,7 +386,7 @@ export default function App() {
                 </span>
                 <span className="mono" style={{ color: C.textHi }}>{inr(cartTotal)} captured</span>
                 <span style={{ color: C.textLo }}>
-                  Reserve remaining{" "}
+                  Daily pool remaining{" "}
                   <span className="mono" style={{ color: C.textHi }}>{inr(reserveRemaining)}</span>
                 </span>
                 <span style={{ color: C.textLo }}>
@@ -383,7 +400,14 @@ export default function App() {
           </>
         )}
 
-        {tab === "approvals" && <Approvals reloadKey={audit.length + approvalsList.length} />}
+        {tab === "approvals" && (
+          <Approvals
+            reloadKey={audit.length + approvalsList.length}
+            names={Object.fromEntries(
+              (live.products.length ? live.products : inventory?.catalog ?? []).map((p) => [p.sku, p.name])
+            )}
+          />
+        )}
 
         {tab === "ledger" && <LedgerTable records={audit.slice().reverse()} />}
 
@@ -393,6 +417,7 @@ export default function App() {
             blockRef={blockRef}
             remaining={reserveRemaining}
             ceiling={ceiling}
+            dailyCeiling={status?.ap2_daily_ceiling_inr}
             lowStockThreshold={inventory?.catalog.find((s) => s.sku === status?.ap2_sku)?.reorder_threshold}
           />
         )}
@@ -427,5 +452,103 @@ function ScenarioBtn({
     >
       <PlayCircle size={14} /> {label}
     </button>
+  );
+}
+
+/** Demo controls — tucked into the header so the canvas stays clean. */
+function DemoControls({ live }: { live: ReturnType<typeof useLive> }) {
+  const [open, setOpen] = useState(false);
+  const [festivalBusy, setFestivalBusy] = useState(false);
+  const [probeBusy, setProbeBusy] = useState(false);
+
+  const toggleFestival = async () => {
+    setFestivalBusy(true);
+    try {
+      if (live.festivalActive) await api.festivalStop();
+      else await api.festivalStart(10);
+      await live.refresh();
+    } finally {
+      setFestivalBusy(false);
+    }
+  };
+
+  const probe = async (sku: string) => {
+    setProbeBusy(true);
+    try {
+      await api.probe(sku);
+    } catch {
+      /* already restocking */
+    } finally {
+      setProbeBusy(false);
+    }
+  };
+
+  const skus = live.products.length
+    ? live.products.map((p) => p.sku)
+    : ["SKU-404", "SKU-101", "SKU-203"];
+
+  return (
+    <div className="relative">
+      {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="relative z-40 flex items-center gap-1.5 text-[11px] px-2.5 py-1.5 rounded-lg transition-colors hover:opacity-90"
+        style={{
+          background: open ? C.brassDim : C.surface,
+          border: `1px solid ${open ? "rgba(168,127,61,0.4)" : C.hair}`,
+          color: open ? C.brass : C.textLo,
+        }}
+        title="Demo controls"
+      >
+        <FlaskConical size={13} />
+        Demo
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-2 w-72 rounded-xl p-4 shadow-xl z-40"
+          style={{ background: C.surface, border: `1px solid ${C.hairStrong}` }}
+        >
+          <div className="text-[10px] font-semibold tracking-[0.08em] mb-3" style={{ color: C.textLo }}>
+            PRESENTER CONTROLS
+          </div>
+
+          <button
+            onClick={toggleFestival}
+            disabled={festivalBusy}
+            className="w-full flex items-center gap-2 text-xs px-3 py-2 rounded-lg mb-3 disabled:opacity-40 hover:opacity-90 transition-opacity font-medium"
+            style={{
+              background: live.festivalActive ? C.redDim : C.greenDim,
+              color: live.festivalActive ? C.red : C.green,
+              border: `1px solid ${live.festivalActive ? "rgba(222,76,74,0.4)" : "rgba(14,159,110,0.4)"}`,
+            }}
+          >
+            {live.festivalActive ? <Square size={13} /> : <Rocket size={13} />}
+            {festivalBusy ? "…" : live.festivalActive ? "Stop festival drop" : "Start festival drop (10s)"}
+          </button>
+
+          <div className="text-[10px] mb-1.5" style={{ color: C.textLo }}>
+            Force a SKU through the gated pipeline:
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {skus.map((sku) => (
+              <button
+                key={sku}
+                disabled={probeBusy}
+                onClick={() => probe(sku)}
+                className="mono text-[10px] px-2 py-1 rounded-md disabled:opacity-40 hover:opacity-80 transition-opacity"
+                style={{ background: C.raised, color: C.textHi, border: `1px solid ${C.hair}` }}
+                title={`manual probe — ${sku}`}
+              >
+                {sku.replace("SKU-", "")}
+              </button>
+            ))}
+          </div>
+
+          <div className="text-[10px] mt-3 leading-relaxed pt-3" style={{ color: C.textLo, borderTop: `1px solid ${C.hair}` }}>
+            Tip: run the festival drop twice to exhaust the ₹1 lakh daily pool and watch the portfolio-cap escalation fire live.
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

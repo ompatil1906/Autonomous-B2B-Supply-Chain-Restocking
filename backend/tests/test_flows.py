@@ -10,13 +10,14 @@ from app.services import approvals as approvals_store
 from app.services import reserve_pay, warehouse
 from app.services.razorpay_mcp import RazorpayMcpClient
 
-APPROVALS_FILE = "backend/data/approvals.json"
+from app.paths import APPROVALS_FILE as APPROVALS_FILE
 
 
 @pytest.fixture(autouse=True)
 def clean_state():
     clear_audit()
     reserve_pay._blocks.clear()
+    reserve_pay._daily_block_id = None
     warehouse.reset()
     if os.path.exists(APPROVALS_FILE):
         os.remove(APPROVALS_FILE)
@@ -30,7 +31,9 @@ async def test_happy_path_autonomous_capture():
     assert result["gate"]["passed"] is True
     assert result["cart"]["credentialSubject"]["total_inr"] == 9800.0
     assert result["capture_result"]["status"] == "captured"
-    assert result["reserve_block"]["remaining_inr"] == pytest.approx(200.0)
+    # Debits draw from the shared ₹1,00,000 portfolio-level daily Reserve Pay block.
+    assert result["reserve_block"]["reserved_inr"] == pytest.approx(100_000.0)
+    assert result["reserve_block"]["remaining_inr"] == pytest.approx(90_200.0)
     assert result["stock_after"]["SKU-404"] == 112  # 12 + 100
     assert verify_chain()["valid"] is True
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -13,14 +14,28 @@ from pydantic import BaseModel, Field
 from app.agent.graph import run_agent
 from app.audit import read_all, verify_chain
 from app.config import settings
+from app.products import PRODUCTS
 from app.services import approvals as approvals_store
 from app.services import reserve_pay, warehouse
+from app.services.live_ops import LiveOps
 from app.services.razorpay_mcp import RazorpayMcpClient
+from app.ws import hub
+from app.paths import DATA_DIR, LAST_RUN_FILE
 
-DATA_DIR = os.path.join("backend", "data")
-LAST_RUN_FILE = os.path.join(DATA_DIR, "last_run.json")
 
-app = FastAPI(title="AP2-Bounded Restocking Agent", version="0.1.0")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    warehouse.reset()
+    await live.start()
+    yield
+    await live.stop_festival()
+
+
+app = FastAPI(title="AP2-Bounded Restocking Agent", version="0.1.0", lifespan=lifespan)
+
+# The Live Ops orchestrator: demand simulation → predictive triggers → gated
+# autonomous purchasing, all broadcast over the shared WS hub.
+live = LiveOps(hub.broadcast)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,29 +53,6 @@ class RunRequest(BaseModel):
     reset_inventory: bool = True
 
 
-class _Hub:
-    """Broadcasts run events to connected WebSocket clients."""
-
-    def __init__(self):
-        self.clients: set[WebSocket] = set()
-
-    async def connect(self, ws: WebSocket):
-        await ws.accept()
-        self.clients.add(ws)
-
-    def disconnect(self, ws: WebSocket):
-        self.clients.discard(ws)
-
-    async def broadcast(self, payload: dict):
-        msg = json.dumps(payload, ensure_ascii=False, default=str)
-        for ws in list(self.clients):
-            try:
-                await ws.send_text(msg)
-            except Exception:
-                self.clients.discard(ws)
-
-
-hub = _Hub()
 _runs: list[dict] = []
 
 # Single-flight: concurrent /api/run calls queue instead of racing the gate and
@@ -101,7 +93,7 @@ async def _run_scenario(req: RunRequest) -> dict:
             }
         )
 
-    await hub.broadcast({"type": "run_started", "scenario": req.scenario})
+    await hub.broadcast({"type": "run_started", "scenario": req.scenario, "sku": req.sku})
     try:
         result = await run_agent(
             sku=req.sku,
@@ -111,11 +103,11 @@ async def _run_scenario(req: RunRequest) -> dict:
             on_update=on_update,
         )
     except Exception as exc:
-        await hub.broadcast({"type": "run_failed", "scenario": req.scenario, "error": str(exc)})
+        await hub.broadcast({"type": "run_failed", "scenario": req.scenario, "sku": req.sku, "error": str(exc)})
         raise exc
     _runs.append(result)
     _persist_last_run(result)
-    await hub.broadcast({"type": "run_completed", "scenario": req.scenario, "result": result})
+    await hub.broadcast({"type": "run_completed", "scenario": req.scenario, "sku": req.sku, "result": result})
     return result
 
 
@@ -135,10 +127,24 @@ async def status() -> dict:
         "ap2_sku": settings.ap2_mandate_sku,
         "ap2_max_qty": settings.ap2_mandate_max_qty,
         "ap2_max_unit_price": settings.ap2_mandate_max_unit_price,
+        "ap2_daily_ceiling_inr": settings.ap2_daily_ceiling_inr,
         "supplier_name": settings.supplier_name,
         "merchant_name": settings.merchant_name,
         "merchant_phone": settings.merchant_phone,
         "intent_expiry_hours": settings.ap2_intent_expiry_hours,
+        # the full portfolio the agent is chartered to manage
+        "portfolio": [
+            {
+                "sku": p.sku,
+                "name": p.name,
+                "price_inr": p.price_inr,
+                "restock_qty": p.restock_qty,
+                "ceiling_inr": p.ceiling_inr,
+                "max_unit_price_inr": p.max_unit_price_inr,
+                "festival": p.festival,
+            }
+            for p in PRODUCTS.values()
+        ],
     }
 
 
@@ -219,6 +225,38 @@ async def runs() -> dict:
 @app.get("/api/runs/latest")
 async def latest_run() -> dict:
     return {"latest": _runs[-1] if _runs else None}
+
+
+# ---------------------------------------------------------------- Live Ops API
+
+class FestivalRequest(BaseModel):
+    delay_s: float = Field(10.0, ge=0, le=120)
+
+
+@app.get("/api/live/state")
+async def live_state() -> dict:
+    """Bootstrap snapshot for the Live Ops screen (then everything streams over WS)."""
+    return live.snapshot_state()
+
+
+@app.post("/api/festival/start")
+async def festival_start(req: FestivalRequest) -> dict:
+    return await live.start_festival(delay_s=req.delay_s)
+
+
+@app.post("/api/festival/stop")
+async def festival_stop() -> dict:
+    await live.stop_festival()
+    return {"stopped": True}
+
+
+@app.post("/api/live/probe/{sku}")
+async def live_probe(sku: str) -> dict:
+    """Dev-panel probe: force a SKU through the same gated pipeline (budget-breach demo)."""
+    trigger = live.force_trigger(sku)
+    if trigger is None:
+        raise HTTPException(status_code=409, detail=f"SKU {sku} is not visible or already restocking")
+    return trigger
 
 
 @app.post("/api/run", response_model=dict)

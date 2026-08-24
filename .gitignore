@@ -27,5 +27,6 @@ frontend/.vite/
 
 # Runtime artifacts
 backend/data/*.jsonl
+backend/data/*.json
 backend/data/keys/
 *.log

@@ -5,9 +5,26 @@ import type { AuditRecord, VerifyResult } from "../lib/types";
 import { C } from "../lib/theme";
 import { KIND_LABELS, payloadSummary } from "../lib/format";
 
+type KindGroup = "all" | "agent" | "reserve_pay" | "approvals";
+
+const GROUPS: { id: KindGroup; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "agent", label: "Agent" },
+  { id: "reserve_pay", label: "Reserve Pay" },
+  { id: "approvals", label: "Approvals & alerts" },
+];
+
+function inGroup(kind: string, g: KindGroup): boolean {
+  if (g === "all") return true;
+  if (g === "agent") return kind.startsWith("agent.");
+  if (g === "reserve_pay") return kind.startsWith("reserve_pay.") || kind.startsWith("razorpay.");
+  return kind.startsWith("approval.") || kind === "notification.sent";
+}
+
 export function LedgerTable({ records }: { records: AuditRecord[] }) {
   const [verify, setVerify] = useState<VerifyResult | null>(null);
   const [verifying, setVerifying] = useState(false);
+  const [group, setGroup] = useState<KindGroup>("all");
 
   const runVerify = async () => {
     setVerifying(true);
@@ -17,6 +34,8 @@ export function LedgerTable({ records }: { records: AuditRecord[] }) {
       setVerifying(false);
     }
   };
+
+  const filtered = records.filter((r) => inGroup(r.kind, group));
 
   return (
     <div className="max-w-5xl mx-auto rounded-xl p-5" style={{ background: C.surface, border: `1px solid ${C.hair}` }}>
@@ -56,9 +75,32 @@ export function LedgerTable({ records }: { records: AuditRecord[] }) {
         </div>
       )}
 
-      {records.length === 0 ? (
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        {GROUPS.map((g) => {
+          const active = group === g.id;
+          return (
+            <button
+              key={g.id}
+              onClick={() => setGroup(g.id)}
+              className="text-[11px] px-2.5 py-1 rounded-full transition-opacity hover:opacity-90"
+              style={
+                active
+                  ? { background: C.brassDim, color: C.brass, border: "1px solid rgba(168,127,61,0.45)" }
+                  : { background: "transparent", color: C.textLo, border: `1px solid ${C.hair}` }
+              }
+            >
+              {g.label}
+            </button>
+          );
+        })}
+        <span className="text-[11px] ml-auto mono" style={{ color: C.textLo }}>
+          {filtered.length} / {records.length}
+        </span>
+      </div>
+
+      {filtered.length === 0 ? (
         <div className="text-sm py-14 text-center" style={{ color: C.textLo }}>
-          No entries yet — run a scenario from Mission control to populate the ledger.
+          No entries in this filter yet — run a scenario or open Live Ops to populate the ledger.
         </div>
       ) : (
         <table className="w-full text-xs">
@@ -68,11 +110,11 @@ export function LedgerTable({ records }: { records: AuditRecord[] }) {
               <th className="py-2 pr-2 font-normal">Event</th>
               <th className="py-2 pr-2 font-normal w-24">Time (UTC)</th>
               <th className="py-2 pr-2 font-normal w-36">Prev hash</th>
-              <th className="py-2 font-normal w-36">Hash</th>
+              <th className="py-2 pr-2 font-normal w-36">Hash</th>
             </tr>
           </thead>
           <tbody>
-            {records.slice(0, 80).map((r) => (
+            {filtered.slice(0, 80).map((r) => (
               <tr key={r.seq} style={{ borderTop: `1px solid ${C.hair}` }}>
                 <td className="py-2 pr-2 mono" style={{ color: C.textLo }}>
                   {r.seq}

@@ -30,6 +30,7 @@ class ReserveBlock:
 
 _lock = threading.Lock()
 _blocks: dict[str, ReserveBlock] = {}
+_daily_block_id: str | None = None
 
 
 def create_block(reserved_inr: float, mandate_id: str, agent_purpose: str = "Inventory AI") -> ReserveBlock:
@@ -47,6 +48,54 @@ def create_block(reserved_inr: float, mandate_id: str, agent_purpose: str = "Inv
             },
         )
         return block
+
+
+def get_or_create_daily_block(ceiling_inr: float) -> ReserveBlock:
+    """One UPI Reserve Pay block per day, shared by every autonomous restock.
+
+    In production NPCI Reserve Pay blocks once and the agent debits repeatedly —
+    modeling it as a single portfolio-level pool (instead of a block per run)
+    is both more faithful and what makes the DAILY ceiling enforceable.
+    """
+    global _daily_block_id
+    with _lock:
+        if _daily_block_id and _daily_block_id in _blocks:
+            return _blocks[_daily_block_id]
+        from datetime import date
+
+        block = ReserveBlock(
+            f"rbp_daily_{date.today().isoformat()}", ceiling_inr, "DAILY-PORTFOLIO-CAP"
+        )
+        _blocks[block.block_id] = block
+        _daily_block_id = block.block_id
+        append(
+            "reserve_pay.blocked",
+            {
+                "block_id": block.block_id,
+                "reserved_inr": ceiling_inr,
+                "agent_purpose": "Portfolio daily cap (all SKUs)",
+                "intent_mandate_id": "DAILY-PORTFOLIO-CAP",
+                "simulated": settings.razorpay_mode != "remote",
+            },
+        )
+        return block
+
+
+def daily_summary() -> dict:
+    """DailyBudget for the wire; zeroed shape before any run today."""
+    with _lock:
+        b = _blocks.get(_daily_block_id) if _daily_block_id else None
+        if b is None:
+            return {
+                "block_id": None,
+                "ceilingRupees": settings.ap2_daily_ceiling_inr,
+                "spentRupees": 0.0,
+            }
+        return {
+            "block_id": b.block_id,
+            "ceilingRupees": round(b.reserved_inr, 2),
+            "spentRupees": round(b.reserved_inr - b.remaining_inr, 2),
+        }
 
 
 def get_block(block_id: str) -> ReserveBlock | None:

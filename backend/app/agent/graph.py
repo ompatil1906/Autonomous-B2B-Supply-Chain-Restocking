@@ -7,6 +7,7 @@ hallucinates.
 """
 from __future__ import annotations
 
+import asyncio
 import operator
 from typing import Annotated, Any, TypedDict
 
@@ -27,6 +28,11 @@ class AgentState(TypedDict, total=False):
     sku: str
     scenario: str  # "happy" | "failure"
     override_quantity: int | None
+    # Live Ops extensions:
+    limits: dict | None          # per-SKU AP2 bounds (overrides settings defaults)
+    staged: bool                 # sleep between nodes so the cycle is visible
+    portfolio: dict | None       # {"spent": ₹, "ceiling": ₹} for the daily cap check
+    trigger_reason: str | None   # predictive_velocity | hard_floor
 
     intent: IntentMandate | None
     reserve_block: Any  # ReserveBlock
@@ -47,35 +53,49 @@ def _step(state: AgentState, kind: str, **payload: Any) -> list[dict]:
     return [{"kind": kind, **payload}]
 
 
+def _bounds(state: AgentState) -> dict:
+    """Per-SKU mandate bounds — live runs carry explicit limits; the classic
+    single-SKU flow falls back to the settings defaults."""
+    limits = state.get("limits") or {}
+    return {
+        "amount_max_inr": float(limits.get("amount_max_inr", settings.ap2_mandate_limit_inr)),
+        "allowed_skus": list(limits.get("allowed_skus", [settings.ap2_mandate_sku])),
+        "max_quantity_per_sku": int(limits.get("max_quantity_per_sku", settings.ap2_mandate_max_qty)),
+        "max_unit_price_inr": float(limits.get("max_unit_price_inr", settings.ap2_mandate_max_unit_price)),
+    }
+
+
 async def node_pre_compute(state: AgentState) -> dict:
     """Human Authorization: UPI Reserve Pay block + signed AP2 IntentMandate."""
     sku = state["sku"]
-    amount_max = settings.ap2_mandate_limit_inr
+    b = _bounds(state)
+    amount_max = b["amount_max_inr"]
     intent = issue_intent_mandate(
         merchant_did=get_role_did("merchant"),
         agent_did=get_role_did("agent"),
         purpose=f"Autonomous restock of {sku}",
         intent_note=f"Allow the inventory AI agent to autonomously reorder {sku} when stock "
                     f"drops below threshold, up to ₹{amount_max:,.0f}, "
-                    f"{settings.ap2_mandate_max_qty} units max, unit price ≤ ₹{settings.ap2_mandate_max_unit_price:,.0f}.",
+                    f"{b['max_quantity_per_sku']} units max, unit price ≤ ₹{b['max_unit_price_inr']:,.0f}.",
         amount_max_inr=amount_max,
-        allowed_skus=[settings.ap2_mandate_sku],
-        max_quantity_per_sku=settings.ap2_mandate_max_qty,
-        max_unit_price_inr=settings.ap2_mandate_max_unit_price,
+        allowed_skus=b["allowed_skus"],
+        max_quantity_per_sku=b["max_quantity_per_sku"],
+        max_unit_price_inr=b["max_unit_price_inr"],
         valid_for_hours=settings.ap2_intent_expiry_hours,
         user_cart_confirmation_required=False,
         supplier_dids=[get_role_did("supplier")],
     )
-    block = reserve_pay.create_block(
-        reserved_inr=amount_max, mandate_id=intent.id, agent_purpose="Inventory AI"
-    )
+    # One portfolio-level Reserve Pay pool per day — every autonomous restock
+    # debits against it, which is what makes the DAILY ceiling enforceable.
+    block = reserve_pay.get_or_create_daily_block(settings.ap2_daily_ceiling_inr)
     return {
         "intent": intent,
         "reserve_block": block,
         "steps": _step(
             state,
             "pre_compute",
-            message=f"Human blocked ₹{amount_max:,.0f} via UPI Reserve Pay and signed the AP2 IntentMandate",
+            message=f"Human pre-authorized ₹{amount_max:,.0f} for {sku} (IntentMandate signed; "
+                    f"debits draw from the ₹{settings.ap2_daily_ceiling_inr:,.0f} daily Reserve Pay block)",
             intent=mandate_to_json(intent),
             reserve_block=reserve_pay.to_dict(block),
         ),
@@ -88,6 +108,15 @@ async def node_detect(state: AgentState) -> dict:
     if s is None:
         return {"status": "no_action", "steps": _step(state, "detect", message=f"SKU {sku} unknown")}
     below = warehouse.below_threshold(sku)
+    reason = state.get("trigger_reason")
+    if reason == "predictive_velocity":
+        msg = (f"Predictive trigger: projected time-to-stockout inside the 90s agent "
+               f"lead time → acting BEFORE the shelf is empty ({s.stock} units left)")
+    elif reason == "hard_floor":
+        msg = f"Hard-floor safety net fired at {s.stock} units"
+    else:
+        msg = (f"Stock for {sku} = {s.stock}, threshold = {s.reorder_threshold} → "
+               f"{'RESTOCK TRIGGERED' if below else 'no action needed'}")
     return {
         "steps": _step(
             state,
@@ -96,8 +125,7 @@ async def node_detect(state: AgentState) -> dict:
             stock=s.stock,
             threshold=s.reorder_threshold,
             below_threshold=below,
-            message=f"Stock for {sku} = {s.stock}, threshold = {s.reorder_threshold} → "
-                    f"{'RESTOCK TRIGGERED' if below else 'no action needed'}",
+            message=msg,
         ),
     }
 
@@ -105,6 +133,7 @@ async def node_detect(state: AgentState) -> dict:
 async def node_negotiate(state: AgentState) -> dict:
     sku = state["sku"]
     s = warehouse.get(sku)
+    b = _bounds(state)
     cat = supplier.catalog_entry(sku)
     neg = negotiate_quantity(
         sku=sku,
@@ -112,8 +141,8 @@ async def node_negotiate(state: AgentState) -> dict:
         threshold=s.reorder_threshold,
         unit_price=cat["unit_price_inr"],
         suggested_qty=s.reorder_qty,
-        max_qty=settings.ap2_mandate_max_qty,
-        max_unit_price=settings.ap2_mandate_max_unit_price,
+        max_qty=b["max_quantity_per_sku"],
+        max_unit_price=b["max_unit_price_inr"],
         override_quantity=state.get("override_quantity"),
     )
     cart = supplier.build_cart_mandate(
@@ -141,7 +170,7 @@ async def node_negotiate(state: AgentState) -> dict:
 async def node_gate(state: AgentState) -> dict:
     intent: IntentMandate = state["intent"]
     cart: CartMandate = state["cart"]
-    verdict = evaluate_gate(intent, cart)
+    verdict = evaluate_gate(intent, cart, portfolio=state.get("portfolio"))
     append("agent.gate", {"passed": verdict.passed, "summary": verdict.summary})
     return {"gate": verdict.to_dict(), "steps": _step(state, "gate", **verdict.to_dict())}
 
@@ -201,20 +230,36 @@ async def node_execute(state: AgentState) -> dict:
 async def node_escalate(state: AgentState) -> dict:
     cart: CartMandate = state["cart"]
     amount = round(cart.credentialSubject.total_inr, 2)
+    intent_cap = round(state["intent"].credentialSubject.constraints.amount_max_inr, 2)
     client = RazorpayMcpClient()
+
+    failed_checks = [c["name"] for c in (state.get("gate") or {}).get("checks", []) if not c.get("passed")]
+    block_reason = (
+        "daily_portfolio_cap_exceeded"
+        if "daily_portfolio_cap" in failed_checks
+        else "gate_blocked_ceiling_exceeded"
+    )
 
     link = await client.create_payment_link(
         amount_inr=amount,
-        description=f"Supplier price-hike override — {settings.supplier_name} {cart.credentialSubject.quote_ref}",
+        description=f"Boundary override required — {settings.supplier_name} {cart.credentialSubject.quote_ref}",
         reference_id=f"OVR-{cart.credentialSubject.quote_ref}",
         notes={"sku": state["sku"], "cart_mandate_id": cart.id},
     )
 
-    message = (
-        f"Action Blocked. {settings.supplier_name} raised prices; cart total is "
-        f"₹{amount:,.2f}, which exceeds my ₹{settings.ap2_mandate_limit_inr:,.0f} AP2 limit. "
-        f"Please approve manually via this secure link."
-    )
+    if block_reason == "daily_portfolio_cap_exceeded":
+        day_spent = float((state.get("portfolio") or {}).get("spent", 0.0))
+        message = (
+            f"Action Blocked. Approving ₹{amount:,.2f} for {state['sku']} would push today's "
+            f"autonomous spend (₹{day_spent:,.2f}) past the ₹{settings.ap2_daily_ceiling_inr:,.0f} "
+            f"daily portfolio ceiling. Please approve manually via this secure link."
+        )
+    else:
+        message = (
+            f"Action Blocked. {settings.supplier_name} raised prices; cart total is "
+            f"₹{amount:,.2f}, which exceeds my ₹{intent_cap:,.0f} AP2 limit for {state['sku']}. "
+            f"Please approve manually via this secure link."
+        )
     sent = notifications.send_whatsapp(
         to=settings.merchant_phone,
         message=message,
@@ -236,10 +281,10 @@ async def node_escalate(state: AgentState) -> dict:
         sku=state["sku"],
         quantity=state["quantity"],
         total_inr=amount,
-        ceiling_inr=settings.ap2_mandate_limit_inr,
+        ceiling_inr=intent_cap,
         cart_mandate=mandate_to_json(cart),
         quote_ref=cart.credentialSubject.quote_ref,
-        reason="gate_blocked_ceiling_exceeded",
+        reason=block_reason,
         payment_link=link,
     )
 
@@ -271,6 +316,7 @@ async def node_finish(state: AgentState) -> dict:
         "scenario": state["scenario"],
         "sku": state["sku"],
         "quantity": state["quantity"],
+        "trigger_reason": state.get("trigger_reason"),
         "intent": mandate_to_json(state["intent"]),
         "cart": mandate_to_json(state["cart"]),
         "gate": state["gate"],
@@ -314,11 +360,29 @@ async def run_agent(
     override_quantity: int | None = None,
     reset_inventory: bool = True,
     on_update=None,
+    limits: dict | None = None,
+    staged: bool = False,
+    portfolio: dict | None = None,
+    trigger_reason: str | None = None,
 ) -> dict:
-    """Execute the agent. `on_update(node_name, node_update)` is awaited after every node."""
+    """Execute the agent. `on_update(node_name, node_update)` is awaited after every node.
+
+    Live Ops passes `limits` (per-SKU AP2 bounds), `staged=True` (sleep between
+    nodes so a ~35s cycle is visible on stage) and `portfolio` (today's committed
+    spend vs the daily ceiling, enforced by the gate).
+    """
     if reset_inventory:
         warehouse.reset()
-    initial = AgentState(sku=sku, scenario=scenario, override_quantity=override_quantity, steps=[])
+    initial = AgentState(
+        sku=sku,
+        scenario=scenario,
+        override_quantity=override_quantity,
+        steps=[],
+        limits=limits,
+        staged=staged,
+        portfolio=portfolio,
+        trigger_reason=trigger_reason,
+    )
     app = build_graph()
     summary: dict | None = None
     steps: list[dict] = []
@@ -330,6 +394,8 @@ async def run_agent(
                 summary = data["summary"]
             if isinstance(data, dict) and data.get("steps"):
                 steps.extend(data["steps"])
+            if staged and node != "finish":
+                await asyncio.sleep(settings.live_node_delay_s)
     if summary is None:
         raise RuntimeError("Agent run finished without a summary")
     return summary | {"steps": steps}

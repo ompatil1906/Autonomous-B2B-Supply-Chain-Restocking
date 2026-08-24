@@ -14,6 +14,13 @@ class Settings(BaseSettings):
     ap2_mandate_ttl_minutes: int = 1_440
     ap2_intent_expiry_hours: int = 24
 
+    # Live Ops — portfolio-level daily autonomous spend ceiling, enforced by the
+    # gate as a boundary check across ALL SKUs (on top of each per-SKU intent).
+    ap2_daily_ceiling_inr: float = 100_000.0
+    # Staged latency per agent node in live mode (~6 nodes ≈ 35s cycle) so the
+    # race between the predictive trigger and the restock is visible on stage.
+    live_node_delay_s: float = 6.0
+
     # Agent / LLM
     agent_llm_provider: str = "gemini"  # openai | anthropic | gemini | mock
     agent_llm_model: str = "gemini/gemini-3.5-flash-lite"

@@ -65,7 +65,15 @@ def verify_cart_signature(cart: CartMandate) -> bool:
     )
 
 
-def evaluate_gate(intent: IntentMandate, cart: CartMandate) -> GateVerdict:
+def evaluate_gate(intent: IntentMandate, cart: CartMandate, portfolio: dict | None = None) -> GateVerdict:
+    """Evaluate the deterministic boundary checks.
+
+    `portfolio` (optional): {"spent": float, "ceiling": float} — today's committed
+    autonomous spend across ALL SKUs vs the portfolio-level daily ceiling. When
+    supplied, an extra `daily_portfolio_cap` check enforces that this cart still
+    fits under the day's budget, exactly like the per-SKU intent caps but at
+    portfolio scale.
+    """
     checks: list[GateCheck] = []
     c = intent.credentialSubject.constraints
     cs = cart.credentialSubject
@@ -131,7 +139,24 @@ def evaluate_gate(intent: IntentMandate, cart: CartMandate) -> GateVerdict:
         )
     )
 
-    # 6. SKUs, quantities, unit prices
+    # 6. Portfolio-level daily cap (Live Ops only)
+    if portfolio is not None:
+        day_spent = round(float(portfolio.get("spent", 0.0)), 2)
+        day_ceiling = round(float(portfolio["ceiling"]), 2)
+        fits = total + day_spent <= day_ceiling
+        checks.append(
+            GateCheck(
+                "daily_portfolio_cap",
+                fits,
+                f"Daily autonomous spend ₹{day_spent:,.2f} + cart ₹{total:,.2f} "
+                f"<= portfolio ceiling ₹{day_ceiling:,.2f}"
+                if fits
+                else f"Cart ₹{total:,.2f} would push today's autonomous spend "
+                f"(₹{day_spent:,.2f}) past the ₹{day_ceiling:,.2f} portfolio ceiling",
+            )
+        )
+
+    # 7. SKUs, quantities, unit prices
     sku_ok = True
     qty_ok = True
     price_ok = True
@@ -169,7 +194,7 @@ def evaluate_gate(intent: IntentMandate, cart: CartMandate) -> GateVerdict:
         )
     )
 
-    # 7. Supplier allow-list
+    # 8. Supplier allow-list
     supplier_ok = (not c.supplier_dids) or (cs.merchant_did in c.supplier_dids)
     checks.append(
         GateCheck(
@@ -179,7 +204,7 @@ def evaluate_gate(intent: IntentMandate, cart: CartMandate) -> GateVerdict:
         )
     )
 
-    # 8. Autonomous mode permitted
+    # 9. Autonomous mode permitted
     autonomous_ok = c.user_cart_confirmation_required is False
     checks.append(
         GateCheck(

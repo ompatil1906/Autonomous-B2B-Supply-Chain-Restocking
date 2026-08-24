@@ -1,8 +1,14 @@
-"""Mock warehouse inventory. SKU-404 is the best-selling SKU used in the demo."""
+"""Mock warehouse inventory, seeded from the product catalog.
+
+Festival SKUs carry stock too (their launch batch) — visibility on the shop
+floor is decided by the Live Ops orchestrator via `launchedAt`, not here.
+"""
 from __future__ import annotations
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+
+from app.products import PRODUCTS
 
 
 @dataclass
@@ -15,12 +21,17 @@ class Sku:
     velocity: str
 
 
-_skus: dict[str, Sku] = {
-    "SKU-404": Sku("SKU-404", "Minimal Cotton Tee (Black)", stock=12, reorder_threshold=20, reorder_qty=100, velocity="high"),
-    "SKU-101": Sku("SKU-101", "Organic Hoodie", stock=140, reorder_threshold=40, reorder_qty=60, velocity="medium"),
-    "SKU-202": Sku("SKU-202", "Canvas Tote", stock=300, reorder_threshold=60, reorder_qty=120, velocity="medium"),
-}
+def _seed() -> dict[str, Sku]:
+    out: dict[str, Sku] = {}
+    for p in PRODUCTS.values():
+        opening = p.seed_stock if not p.festival else p.launch_stock
+        heat = "high" if p.sku == "SKU-404" else "medium"
+        out[p.sku] = Sku(p.sku, p.name, stock=opening, reorder_threshold=p.reorder_threshold,
+                         reorder_qty=p.restock_qty, velocity=heat)
+    return out
 
+
+_skus = _seed()
 _lock = threading.Lock()
 
 
@@ -48,8 +59,7 @@ def stock_levels() -> dict[str, int]:
 
 def apply_restock(sku: str, quantity: int) -> None:
     with _lock:
-        s = _skus[sku]
-        s.stock += quantity
+        _skus[sku].stock += quantity
 
 
 def set_stock(sku: str, quantity: int) -> None:
@@ -57,8 +67,21 @@ def set_stock(sku: str, quantity: int) -> None:
         _skus[sku].stock = quantity
 
 
-def reset(overrides: dict[str, int] | None = None) -> None:
+def record_sale(sku: str, qty: int) -> tuple[int, bool]:
+    """Decrement stock; returns (new_stock, hit_zero). Floors at zero."""
     with _lock:
-        for s in _skus.values():
-            s.stock = overrides.get(s.sku, 0) if overrides else 0
-        _skus["SKU-404"].stock = 12
+        s = _skus[sku]
+        s.stock = max(0, s.stock - qty)
+        return s.stock, s.stock == 0
+
+
+def reset(overrides: dict[str, int] | None = None) -> None:
+    global _skus
+    overrides = overrides or {}
+    with _lock:
+        _skus = _seed()
+        for sku, stock in overrides.items():
+            if sku in _skus:
+                _skus[sku].stock = stock
+        # Legacy single-SKU demo always starts from the canonical 12-unit state.
+        _skus["SKU-404"].stock = overrides.get("SKU-404", 12)

@@ -8,8 +8,8 @@ from cryptography.hazmat.primitives.serialization import (
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from app.config import settings
+from app.paths import KEY_DIR
 
-KEY_DIR = "backend/data/keys"
 
 
 def _path(name: str) -> str:

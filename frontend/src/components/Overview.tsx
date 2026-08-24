@@ -1,14 +1,14 @@
 import { ArrowRight, ShieldCheck, TrendingUp, Wallet, Boxes, BellRing } from "lucide-react";
 import type { AuditRecord, Inventory, SystemStatus } from "../lib/types";
 import { C, inr } from "../lib/theme";
-import { KIND_LABELS, payloadSummary } from "../lib/format";
+import { KIND_LABELS, payloadSummary, fmtCompact } from "../lib/format";
 
 export function Overview({
   status,
   inventory,
   audit,
   pendingCount,
-  saves,
+  spentToday,
   onOpenMission,
   onOpenApprovals,
 }: {
@@ -16,14 +16,20 @@ export function Overview({
   inventory: Inventory | null;
   audit: AuditRecord[];
   pendingCount: number;
-  saves: number;
+  spentToday?: number;
   onOpenMission: () => void;
   onOpenApprovals: () => void;
 }) {
+  const dailyCeiling = status?.ap2_daily_ceiling_inr ?? 100_000;
   const kpis = [
-    { icon: Boxes, label: "SKUs monitored", value: String(inventory?.catalog.length ?? "—"), tone: C.textHi },
-    { icon: Wallet, label: "Ceiling protected", value: inr(status?.ap2_limit_inr), tone: C.brass },
-    { icon: TrendingUp, label: "Autonomous captures", value: String(saves), tone: C.green },
+    { icon: Boxes, label: "SKUs under mandate", value: String(inventory?.catalog.length ?? "—"), tone: C.textHi },
+    { icon: Wallet, label: "Daily authority", value: fmtCompact(dailyCeiling), tone: C.brass },
+    {
+      icon: TrendingUp,
+      label: "Committed today",
+      value: `${fmtCompact(spentToday ?? 0)} / ${fmtCompact(dailyCeiling)}`,
+      tone: C.green,
+    },
     { icon: BellRing, label: "Escalations pending", value: String(pendingCount), tone: pendingCount ? C.red : C.textHi },
   ];
 
@@ -34,8 +40,10 @@ export function Overview({
         <span style={{ color: C.brass }}> Warden is the boundary.</span>
       </h1>
       <p className="mt-3 text-sm max-w-2xl" style={{ color: C.textLo }}>
-        One SKU, one supplier, one signed AP2 IntentMandate and a UPI Reserve Pay block. The agent
-        restocks autonomously inside the mandate — and provably cannot spend a paisa more.
+        Six SKUs, one signed AP2 IntentMandate behind every purchase, and a single{" "}
+        {inr(dailyCeiling)} UPI Reserve Pay block shared across the whole portfolio. A predictive
+        velocity engine restocks autonomously inside those boundaries — and provably cannot spend a
+        paisa more.
       </p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
@@ -73,7 +81,7 @@ export function Overview({
         </div>
         {audit.length === 0 ? (
           <div className="text-sm py-6 text-center" style={{ color: C.textLo }}>
-            Nothing yet — run a scenario in Mission control.
+            Nothing yet — open Live Ops or run a scenario in Mission control.
           </div>
         ) : (
           <div className="space-y-2">

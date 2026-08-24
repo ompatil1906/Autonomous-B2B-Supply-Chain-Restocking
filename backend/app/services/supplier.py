@@ -6,12 +6,11 @@ import uuid
 from app.ap2.signer import issue_cart_mandate
 from app.ap2.keys import get_role_did
 from app.config import settings
+from app.products import PRODUCTS
 
-# Base unit price per SKU as catalogued by the supplier.
+# Supplier's price list mirrors the merchant catalog (same SKUs, same prices).
 _CATALOG = {
-    "SKU-404": {"name": "Minimal Cotton Tee (Black)", "unit_price_inr": 98.0},
-    "SKU-101": {"name": "Organic Hoodie", "unit_price_inr": 420.0},
-    "SKU-202": {"name": "Canvas Tote", "unit_price_inr": 160.0},
+    p.sku: {"name": p.name, "unit_price_inr": p.price_inr} for p in PRODUCTS.values()
 }
 
 

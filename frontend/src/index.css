@@ -35,3 +35,9 @@ pre.json-view {
   white-space: pre-wrap;
   word-break: break-word;
 }
+/* Festival Mode CTA — soft expanding ring */
+@keyframes ctaPulse {
+  0% { box-shadow: 0 0 0 0 rgba(14, 159, 110, 0.28); }
+  70% { box-shadow: 0 0 0 10px rgba(14, 159, 110, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(14, 159, 110, 0); }
+}

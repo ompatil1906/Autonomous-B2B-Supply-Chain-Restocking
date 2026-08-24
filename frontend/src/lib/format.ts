@@ -1,5 +1,12 @@
 import type { AuditRecord } from "./types";
 
+/** Indian-style compact rupees: ₹1L, ₹40k, ₹900 */
+export function fmtCompact(v: number): string {
+  if (v >= 100_000) return `₹${+(v / 100_000).toFixed(1).replace(/\.0$/, "")}L`;
+  if (v >= 1000) return `₹${Math.round(v / 1000)}k`;
+  return `₹${Math.round(v)}`;
+}
+
 export function payloadSummary(r: AuditRecord): string {
   const parts: string[] = [];
   if (r.amount_inr !== undefined) parts.push(`₹${r.amount_inr}`);
