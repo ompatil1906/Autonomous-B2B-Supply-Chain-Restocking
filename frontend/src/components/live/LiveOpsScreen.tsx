@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Rocket, Zap } from "lucide-react";
+import { Activity, Zap, Rocket } from "lucide-react";
 import { api } from "../../lib/api";
 import { C } from "../../lib/theme";
 import type { AgentTrigger, AuditRecord } from "../../lib/types";
@@ -55,7 +55,22 @@ export function LiveOpsScreen({
   const calm = !live.festivalActive && live.triggers.length === 0;
 
   return (
-    <div>
+    <div className="pb-12">
+      {/* ---------------- top: AI header ---------------- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: C.textHi }}>
+            Live Intelligence
+          </h1>
+          <p className="text-sm mt-1 flex items-center gap-2" style={{ color: C.textLo }}>
+            <Activity size={14} className={live.healthy ? "text-green-500 animate-pulse" : "text-amber-500"} />
+            {live.healthy 
+              ? "Agent active · Monitoring 6 SKUs · Velocity engine running"
+              : "Connecting to agent..."}
+          </p>
+        </div>
+      </div>
+
       <KpiBar
         ticker={live.ticker}
         criticalCount={criticalCount}
@@ -68,8 +83,9 @@ export function LiveOpsScreen({
 
       <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-6 items-start">
         {/* ---------------- left: shop floor ---------------- */}
-        <div>
+        <div className="flex flex-col gap-6">
           <FestivalRail products={live.products} snapshots={live.snapshots} />
+          
           <ShopFloor
             products={live.products}
             snapshots={live.snapshots}
@@ -87,7 +103,7 @@ export function LiveOpsScreen({
             <button
               onClick={toggleFestival}
               disabled={festivalBusy}
-              className="w-full mt-5 rounded-xl px-4 py-4 flex items-center gap-4 text-left disabled:opacity-60 transition-all group relative overflow-hidden"
+              className="w-full rounded-xl px-4 py-4 flex items-center gap-4 text-left disabled:opacity-60 transition-all group relative overflow-hidden"
               style={{
                 background: C.surface,
                 border: "1px solid rgba(14,159,110,0.55)",
@@ -113,7 +129,7 @@ export function LiveOpsScreen({
                 className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-lg group-hover:opacity-90 transition-opacity"
                 style={{ background: C.greenDim, color: C.green, border: "1px solid rgba(14,159,110,0.45)" }}
               >
-                Click here for Festival Mode
+                Launch
                 <Zap size={13} />
               </span>
             </button>

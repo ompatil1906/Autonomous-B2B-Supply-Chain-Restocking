@@ -31,15 +31,14 @@ export function ShopFloor({
   }, []);
 
   // Best sellers = everyone within 5% of the top revenue rate (velocity × price).
-  // Multiple SKUs can share the crown when they're neck-and-neck; none when nothing sells.
+  // Multiple SKUs can share the crown when they're neck-and-neck on units/min; none when nothing sells.
   const bestSkus = useMemo(() => {
     const rates = new Map<string, number>();
     let maxRate = 0;
     for (const p of products) {
       const upm = snapshots[p.sku]?.unitsPerMinute ?? 0;
-      const rate = upm * p.unitPriceRupees;
-      rates.set(p.sku, rate);
-      if (rate > maxRate) maxRate = rate;
+      rates.set(p.sku, upm);
+      if (upm > maxRate) maxRate = upm;
     }
     const set = new Set<string>();
     if (maxRate > 0) {

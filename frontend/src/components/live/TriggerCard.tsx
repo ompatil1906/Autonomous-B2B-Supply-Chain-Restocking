@@ -1,28 +1,30 @@
 import { useState } from "react";
 import {
   ChevronDown, ChevronRight, CircleDollarSign, ExternalLink,
-  ShieldCheck, ShieldX, AlertTriangle,
+  ShieldCheck, ShieldX, AlertTriangle, Clock, Activity, Zap
 } from "lucide-react";
 import { C, inr } from "../../lib/theme";
 import type { AgentTrigger } from "../../lib/types";
 import { MandateSeal } from "../MandateSeal";
-import { Stat } from "./ui";
 
-const REASON_META: Record<string, { label: string; fg: string; bg: string; hint: string }> = {
+const REASON_META: Record<string, { label: string; icon: any; fg: string; bg: string; hint: string }> = {
   predictive_velocity: {
-    label: "PREDICTIVE",
+    label: "Predictive Restock",
+    icon: Activity,
     fg: C.heat,
     bg: C.heatDim,
     hint: "fired early — projected stockout entered the agent's lead-time window before shelves ran dry",
   },
   hard_floor: {
-    label: "HARD FLOOR",
+    label: "Safety Net Restock",
+    icon: ShieldCheck,
     fg: C.textLo,
     bg: C.raised,
     hint: "safety net — stock fell to the absolute minimum before velocity predicted it",
   },
   manual_probe: {
-    label: "MANUAL PROBE",
+    label: "Manual Override",
+    icon: Zap,
     fg: C.brass,
     bg: C.brassDim,
     hint: "operator-forced run through the same gated pipeline (demo control)",
@@ -31,18 +33,18 @@ const REASON_META: Record<string, { label: string; fg: string; bg: string; hint:
 
 const OUTCOME_META: Record<string, { label: string; fg: string; bg: string }> = {
   in_progress: { label: "IN PROGRESS", fg: C.brass, bg: C.brassDim },
-  executed: { label: "EXECUTED", fg: C.green, bg: C.greenDim },
+  executed: { label: "APPROVED", fg: C.green, bg: C.greenDim },
   escalated: { label: "ESCALATED", fg: C.red, bg: C.redDim },
   failed: { label: "FAILED", fg: C.red, bg: C.redDim },
 };
 
 const STEP_PHRASES = [
   "",
-  "blocking funds · signing intent mandate",
-  "checking shelf level",
-  "requesting supplier quote",
-  "verifying boundary checks",
-  "executing decision",
+  "Blocking funds & signing IntentMandate",
+  "Checking shelf level",
+  "Requesting supplier quote",
+  "Verifying boundary checks",
+  "Executing decision",
 ];
 
 export function TriggerCard({
@@ -63,174 +65,196 @@ export function TriggerCard({
     (c) => c.name === "daily_portfolio_cap" && !c.passed,
   );
   const running = trigger.outcome === "in_progress";
+  
+  const ReasonIcon = meta.icon;
 
   return (
     <div
-      className="rounded-xl overflow-hidden"
+      className="rounded-xl overflow-hidden transition-shadow"
       style={{
         background: C.surface,
         border: `1px solid ${trigger.outcome === "escalated" ? "rgba(222,76,74,0.45)" : C.hair}`,
+        boxShadow: trigger.outcome === "escalated" ? "0 2px 8px rgba(222,76,74,0.1)" : "0 1px 2px rgba(0,0,0,0.02)"
       }}
     >
-      <div className="px-3.5 py-3">
+      <div className="px-4 py-4">
         {/* header row */}
-        <div className="flex items-center gap-2">
-          <span
-            className="text-[9px] tracking-wider px-1.5 py-0.5 rounded font-semibold mono shrink-0"
-            style={{ color: meta.fg, background: meta.bg }}
-            title={meta.hint}
+        <div className="flex items-start justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: meta.bg }}>
+              <ReasonIcon size={16} color={meta.fg} />
+            </div>
+            <div>
+              <div className="text-sm font-semibold flex items-center gap-2" style={{ color: C.textHi }}>
+                {trigger.sku.replace("SKU-", "")}
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full" style={{ color: outcome.fg, background: outcome.bg }}>
+                  {outcome.label}
+                </span>
+              </div>
+              <div className="text-xs mt-0.5" style={{ color: C.textLo }}>
+                {meta.label} · {new Date(trigger.triggeredAtMs).toLocaleTimeString("en-IN")}
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => setOpen(!open)} 
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors" 
+            style={{ color: C.textLo }} 
+            aria-label="details"
           >
-            {meta.label}
-          </span>
-          <span className="mono text-[13px] font-semibold" style={{ color: C.textHi }}>
-            {trigger.sku.replace("SKU-", "")}
-          </span>
-          <span className="ml-auto flex items-center gap-2 shrink-0">
-            <span className="mono text-[9px]" style={{ color: C.textLo }}>
-              {new Date(trigger.triggeredAtMs).toLocaleTimeString("en-IN")}
-            </span>
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded-full font-medium"
-              style={{ color: outcome.fg, background: outcome.bg }}
-            >
-              {outcome.label}
-            </span>
-            <button onClick={() => setOpen(!open)} style={{ color: C.textLo }} aria-label="details">
-              {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </button>
-          </span>
+            {open ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          </button>
         </div>
 
         {/* evidence — three labeled stats */}
-        <div className="grid grid-cols-3 gap-2 mt-2.5 rounded-lg py-2 px-2.5" style={{ background: C.raised }}>
-          <Stat label="STOCK AT TRIGGER" value={`${trigger.stockAtTrigger} units`} />
-          <Stat
-            label="VELOCITY"
-            value={`${Math.round(trigger.velocityAtTrigger)}/min`}
-            tone={trigger.velocityAtTrigger >= 25 ? C.red : C.heat}
-          />
-          <Stat
-            label="PREDICTED STOCKOUT"
-            value={
-              trigger.predictedSecondsAtTrigger != null
-                ? `${Math.round(trigger.predictedSecondsAtTrigger)}s`
-                : "—"
-            }
-          />
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="rounded-lg p-3" style={{ background: C.raised }}>
+            <div className="text-[10px] font-semibold tracking-wider uppercase mb-1" style={{ color: C.textLo }}>Stock Level</div>
+            <div className="mono text-lg font-semibold leading-none" style={{ color: C.textHi }}>
+              {trigger.stockAtTrigger}
+            </div>
+          </div>
+          <div className="rounded-lg p-3" style={{ background: trigger.velocityAtTrigger >= 25 ? C.redDim : C.raised }}>
+            <div className="text-[10px] font-semibold tracking-wider uppercase mb-1" style={{ color: trigger.velocityAtTrigger >= 25 ? C.red : C.textLo }}>Velocity</div>
+            <div className="mono text-lg font-semibold leading-none" style={{ color: trigger.velocityAtTrigger >= 25 ? C.red : C.textHi }}>
+              {Math.round(trigger.velocityAtTrigger)}<span className="text-xs">/min</span>
+            </div>
+          </div>
+          <div className="rounded-lg p-3" style={{ background: C.raised }}>
+            <div className="text-[10px] font-semibold tracking-wider uppercase mb-1" style={{ color: C.textLo }}>Prediction</div>
+            <div className="mono text-lg font-semibold leading-none flex items-center gap-1" style={{ color: C.textHi }}>
+              {trigger.predictedSecondsAtTrigger != null ? (
+                <>
+                  <Clock size={14} style={{ color: C.textMuted }} />
+                  {Math.round(trigger.predictedSecondsAtTrigger)}s
+                </>
+              ) : "—"}
+            </div>
+          </div>
         </div>
 
         {/* pipeline progress */}
-        <div className="flex items-center gap-[3px] mt-2.5">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div
-              key={i}
-              className="h-[3px] flex-1 rounded-full transition-colors duration-300"
-              style={{
-                background:
-                  trigger.outcome === "failed" && i === trigger.currentStep
-                    ? C.red
-                    : i <= trigger.currentStep
-                      ? trigger.outcome === "escalated" && i >= 5
-                        ? C.red
-                        : C.brass
-                      : C.hair,
-                opacity: i <= trigger.currentStep || !running ? 1 : 0.6,
-              }}
-            />
-          ))}
+        <div className="mb-2">
+          <div className="flex items-center gap-1.5 mb-2">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className="h-1.5 flex-1 rounded-full transition-all duration-300"
+                style={{
+                  background:
+                    trigger.outcome === "failed" && i === trigger.currentStep
+                      ? C.red
+                      : i <= trigger.currentStep
+                        ? trigger.outcome === "escalated" && i >= 5
+                          ? C.red
+                          : C.brass
+                        : C.hair,
+                  opacity: i <= trigger.currentStep || !running ? 1 : 0.4,
+                }}
+              />
+            ))}
+          </div>
+          
+          <div className="flex justify-between items-center text-xs">
+            {running ? (
+              <span className="font-medium animate-pulse" style={{ color: C.brass }}>
+                {STEP_PHRASES[Math.min(5, Math.max(1, trigger.currentStep))]}…
+              </span>
+            ) : trigger.outcome === "escalated" ? (
+              <span className="font-medium" style={{ color: capFailed ? C.red : C.textLo }}>
+                Paused at step {Math.min(5, Math.max(1, trigger.currentStep))}
+              </span>
+            ) : trigger.outcome === "executed" ? (
+              <span className="font-medium" style={{ color: C.green }}>Restock complete</span>
+            ) : (
+              <span className="font-medium" style={{ color: C.red }}>Pipeline failed</span>
+            )}
+            
+            {running && (
+              <span className="mono text-[10px]" style={{ color: C.brass }}>
+                Step {Math.min(5, Math.max(1, trigger.currentStep))}/5
+              </span>
+            )}
+          </div>
         </div>
-        {running && (
-          <div className="text-[10px] mt-1.5 animate-pulse" style={{ color: C.brass }}>
-            agent purchasing — {STEP_PHRASES[Math.min(5, Math.max(1, trigger.currentStep))]}…
-          </div>
-        )}
-        {!running && trigger.outcome === "escalated" && (
-          <div className="text-[10px] mt-1.5" style={{ color: capFailed ? C.red : C.textLo }}>
-            paused at step {Math.min(5, Math.max(1, trigger.currentStep))} — waiting for a human decision
-          </div>
-        )}
 
         {/* outcomes */}
         {trigger.outcome === "executed" && (
-          <div
-            className="mt-2.5 rounded-r-lg pl-2.5 pr-2 py-2 text-xs"
-            style={{
-              background: C.greenDim,
-              borderLeft: `3px solid ${C.green}`,
-            }}
-          >
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <span className="mono font-semibold" style={{ color: C.green }}>
-                {inr(trigger.amountInr)}
-              </span>
-              <span style={{ color: C.textHi }}>captured autonomously</span>
-            </div>
-            <div className="text-[10px] mt-0.5" style={{ color: C.textLo }}>
-              gate passed all checks · +{trigger.quantity} units inbound · settled over UPI Reserve Pay
+          <div className="mt-4 rounded-lg p-3 text-sm flex items-start gap-3" style={{ background: C.greenDim, border: `1px solid rgba(16,185,129,0.3)` }}>
+            <ShieldCheck size={18} color={C.green} className="shrink-0 mt-0.5" />
+            <div>
+              <div className="font-semibold mb-0.5" style={{ color: C.green }}>
+                Purchased {trigger.quantity} units for {inr(trigger.amountInr)}
+              </div>
+              <div className="text-xs" style={{ color: C.green, opacity: 0.8 }}>
+                Gate passed all checks · Settled over UPI Reserve Pay
+              </div>
             </div>
           </div>
         )}
 
         {trigger.outcome === "escalated" && (
-          <div
-            className="mt-2.5 rounded-r-lg pl-2.5 pr-2 py-2 text-xs"
-            style={{
-              background: C.redDim,
-              borderLeft: `3px solid ${C.red}`,
-            }}
-          >
-            <div className="flex items-center gap-1.5">
+          <div className="mt-4 rounded-lg p-4 text-sm" style={{ background: C.redDim, border: `1px solid rgba(220,38,38,0.3)` }}>
+            <div className="flex items-start gap-3 mb-3">
               {capFailed ? (
                 <>
-                  <AlertTriangle size={13} color={C.red} className="shrink-0" />
-                  <span className="font-medium" style={{ color: C.red }}>
-                    Day's ₹1 lakh authority is fully committed — this cart needs a human yes/no
-                  </span>
+                  <AlertTriangle size={18} color={C.red} className="shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold mb-0.5" style={{ color: C.red }}>
+                      Daily Authority Exceeded
+                    </div>
+                    <div className="text-xs" style={{ color: C.red, opacity: 0.9 }}>
+                      This {inr(trigger.amountInr)} order pushes past the ₹1 lakh daily limit. Human approval required.
+                    </div>
+                  </div>
                 </>
               ) : (
                 <>
-                  <ShieldX size={13} color={C.red} className="shrink-0" />
-                  <span className="font-medium" style={{ color: C.red }}>
-                    A boundary check failed — funds stayed blocked, nothing captured
-                  </span>
+                  <ShieldX size={18} color={C.red} className="shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-semibold mb-0.5" style={{ color: C.red }}>
+                      Boundary Check Failed
+                    </div>
+                    <div className="text-xs" style={{ color: C.red, opacity: 0.9 }}>
+                      A deterministic gate check failed. Funds stayed blocked, nothing captured.
+                    </div>
+                  </div>
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
+            
+            <div className="flex items-center gap-2 mt-2 flex-wrap pt-3" style={{ borderTop: `1px dashed rgba(220,38,38,0.2)` }}>
               {trigger.paymentLink?.short_url && !trigger.paymentLink.simulated && (
                 <a
                   href={trigger.paymentLink.short_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 mono text-[11px] px-2 py-1 rounded-md hover:opacity-80 transition-opacity"
-                  style={{ background: C.surface, color: C.brass, border: "1px solid rgba(168,127,61,0.4)" }}
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity"
+                  style={{ background: C.surface, color: C.textHi, border: `1px solid ${C.hairStrong}` }}
                 >
-                  Open approval link <ExternalLink size={11} />
+                  Review Details <ExternalLink size={12} />
                 </a>
               )}
               {trigger.paymentLink?.simulated && (
-                <span
-                  className="inline-flex mono text-[10px] px-2 py-1 rounded-md"
-                  style={{ background: C.raised, color: C.textLo, border: `1px dashed ${C.hairStrong}` }}
-                >
-                  simulated link — no live URL
+                <span className="inline-flex text-xs px-2 py-1 rounded-md bg-white/50" style={{ color: C.textLo }}>
+                  Simulated Link
                 </span>
               )}
               {onApprove && (
                 <button
                   disabled={actionBusy}
                   onClick={() => onApprove(trigger)}
-                  className="mono text-[11px] px-2.5 py-1 rounded-md disabled:opacity-40 hover:opacity-80 transition-opacity font-medium"
-                  style={{ background: C.greenDim, color: C.green, border: "1px solid rgba(14,159,110,0.4)" }}
+                  className="text-xs font-semibold px-4 py-1.5 rounded-lg disabled:opacity-50 hover:opacity-90 transition-opacity"
+                  style={{ background: C.red, color: C.surface }}
                 >
-                  Approve purchase
+                  Approve Order
                 </button>
               )}
               {onReject && (
                 <button
                   disabled={actionBusy}
                   onClick={() => onReject(trigger)}
-                  className="mono text-[11px] px-2 py-1 rounded-md underline disabled:opacity-40 transition-opacity"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50 hover:opacity-80 transition-opacity"
                   style={{ color: C.textLo }}
                 >
                   Reject
@@ -241,79 +265,83 @@ export function TriggerCard({
         )}
 
         {trigger.outcome === "failed" && (
-          <div
-            className="mt-2.5 rounded-r-lg pl-2.5 pr-2 py-2 text-xs mono"
-            style={{ background: C.redDim, color: C.red, borderLeft: `3px solid ${C.red}` }}
-          >
-            pipeline error: {trigger.error ?? "unknown"}
+          <div className="mt-4 rounded-lg p-3 text-xs mono" style={{ background: C.redDim, color: C.red, border: `1px solid rgba(220,38,38,0.3)` }}>
+            Pipeline error: {trigger.error ?? "unknown"}
           </div>
         )}
 
         {/* expanded mandate chain */}
         {open && (
-          <div className="mt-3 space-y-2">
-            {trigger.mandates ? (
-              <>
-                <MandateSeal n={1} title="IntentMandate" status="signed"
-                  mandate={trigger.mandates.intent}
-                  fields={[
-                    ["SKU", trigger.sku],
-                    ["Order cap", inr(trigger.mandates.intent.credentialSubject.constraints.amount_max_inr)],
-                    ["Max qty", `${trigger.mandates.intent.credentialSubject.constraints.max_quantity_per_sku}`],
-                  ]}
-                />
-                <MandateSeal n={2} title="CartMandate" status="signed"
-                  mandate={trigger.mandates.cart}
-                  fields={[
-                    ["Qty", `${trigger.quantity}`],
-                    ["Total", inr(trigger.amountInr)],
-                    ["Quote", trigger.mandates.cart.credentialSubject.quote_ref],
-                  ]}
-                />
-                <MandateSeal
-                  n={3}
-                  title="PaymentMandate"
-                  status={trigger.outcome === "executed" ? "signed" : "void"}
-                  mandate={trigger.mandates.payment}
-                  fields={
-                    trigger.outcome === "executed"
-                      ? [
-                          ["Debited", inr(trigger.amountInr)],
-                          ["Rail", "UPI Reserve Pay"],
-                          ["Ref", trigger.paymentId?.slice(0, 18) ?? "—"],
-                        ]
-                      : [["Reason", capFailed ? "Daily portfolio cap" : "Boundary breach"], ["Funds moved", "None"]]
-                  }
-                />
-                {trigger.gate && (
-                  <div className="rounded-lg p-2.5" style={{ background: C.raised }}>
-                    <div className="text-[10px] tracking-wide mb-1.5" style={{ color: C.textLo }}>
-                      DETERMINISTIC GATE CHECKS
-                    </div>
-                    {trigger.gate.checks.map((c) => (
-                      <div key={c.name} className="flex items-start gap-1.5 text-[10px] py-0.5">
-                        {c.passed ? (
-                          <ShieldCheck size={11} color={C.green} className="shrink-0 mt-0.5" />
-                        ) : (
-                          <ShieldX size={11} color={C.red} className="shrink-0 mt-0.5" />
-                        )}
-                        <span className="mono shrink-0" style={{ color: c.passed ? C.textLo : C.red }}>
-                          {c.name}
-                        </span>
-                        <span className="truncate" style={{ color: C.textLo }} title={c.message}>
-                          {c.message}
-                        </span>
+          <div className="mt-5 pt-5" style={{ borderTop: `1px dashed ${C.hairStrong}` }}>
+            <div className="text-[11px] font-semibold tracking-wider uppercase mb-3" style={{ color: C.textLo }}>
+              Mandate Chain Signatures
+            </div>
+            <div className="space-y-2">
+              {trigger.mandates ? (
+                <>
+                  <MandateSeal n={1} title="IntentMandate" status="signed"
+                    mandate={trigger.mandates.intent}
+                    fields={[
+                      ["SKU", trigger.sku],
+                      ["Order cap", inr(trigger.mandates.intent.credentialSubject.constraints.amount_max_inr)],
+                      ["Max qty", `${trigger.mandates.intent.credentialSubject.constraints.max_quantity_per_sku}`],
+                    ]}
+                  />
+                  <MandateSeal n={2} title="CartMandate" status="signed"
+                    mandate={trigger.mandates.cart}
+                    fields={[
+                      ["Qty", `${trigger.quantity}`],
+                      ["Total", inr(trigger.amountInr)],
+                      ["Quote", trigger.mandates.cart.credentialSubject.quote_ref],
+                    ]}
+                  />
+                  <MandateSeal
+                    n={3}
+                    title="PaymentMandate"
+                    status={trigger.outcome === "executed" ? "signed" : "void"}
+                    mandate={trigger.mandates.payment}
+                    fields={
+                      trigger.outcome === "executed"
+                        ? [
+                            ["Debited", inr(trigger.amountInr)],
+                            ["Rail", "UPI Reserve Pay"],
+                            ["Ref", trigger.paymentId?.slice(0, 18) ?? "—"],
+                          ]
+                        : [["Reason", capFailed ? "Daily portfolio cap" : "Boundary breach"], ["Funds moved", "None"]]
+                    }
+                  />
+                  {trigger.gate && (
+                    <div className="rounded-lg p-3 mt-3" style={{ background: C.raised }}>
+                      <div className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: C.textLo }}>
+                        Deterministic Gate Checks
                       </div>
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-[11px] mono py-2" style={{ color: C.textLo }}>
-                <CircleDollarSign size={12} className="inline mr-1" />
-                mandate chain seals appear here as the pipeline completes…
-              </div>
-            )}
+                      <div className="space-y-1.5">
+                        {trigger.gate.checks.map((c) => (
+                          <div key={c.name} className="flex items-start gap-2 text-xs">
+                            {c.passed ? (
+                              <ShieldCheck size={14} color={C.green} className="shrink-0 mt-0.5" />
+                            ) : (
+                              <ShieldX size={14} color={C.red} className="shrink-0 mt-0.5" />
+                            )}
+                            <span className="mono shrink-0" style={{ color: c.passed ? C.textMuted : C.red }}>
+                              {c.name}
+                            </span>
+                            <span className="truncate" style={{ color: C.textLo }} title={c.message}>
+                              {c.message}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm py-4 text-center flex flex-col items-center gap-2" style={{ color: C.textLo }}>
+                  <CircleDollarSign size={20} style={{ color: C.textMuted }} />
+                  Mandate chain seals appear here as the pipeline completes…
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

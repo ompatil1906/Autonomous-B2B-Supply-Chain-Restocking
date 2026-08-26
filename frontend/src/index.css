@@ -1,12 +1,35 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-blue: #2563EB;
+  --color-brand-blue-hover: #1D4ED8;
+  --color-brand-blue-dim: rgba(37, 99, 235, 0.1);
+  --color-brass: #B45309;
+  --color-brass-dim: rgba(180, 83, 9, 0.12);
+  --color-green: #059669;
+  --color-green-dim: rgba(5, 150, 105, 0.1);
+  --color-red: #DC2626;
+  --color-red-dim: rgba(220, 38, 38, 0.1);
+  --color-amber: #D97706;
+  --color-amber-dim: rgba(217, 119, 6, 0.1);
+  --color-bg: #F8F9FB;
+  --color-surface: #FFFFFF;
+  --color-raised: #F1F3F7;
+  --color-hair: rgba(15, 23, 42, 0.07);
+  --color-hair-strong: rgba(15, 23, 42, 0.14);
+  --color-text-hi: #0F172A;
+  --color-text-lo: #475569;
+  --color-text-muted: #94A3B8;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+
 :root {
   color-scheme: light;
 }
 
 body {
-  background: #fafbfc;
-  color: #0f172a;
+  background: var(--color-bg);
+  color: var(--color-text-hi);
   font-family: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
@@ -20,7 +43,7 @@ body {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.18);
+  background: rgba(15, 23, 42, 0.15);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-track {
@@ -31,13 +54,33 @@ pre.json-view {
   font-family: "JetBrains Mono Variable", ui-monospace, monospace;
   font-size: 11px;
   line-height: 1.55;
-  color: #475569;
+  color: var(--color-text-lo);
   white-space: pre-wrap;
   word-break: break-word;
 }
-/* Festival Mode CTA — soft expanding ring */
+
 @keyframes ctaPulse {
-  0% { box-shadow: 0 0 0 0 rgba(14, 159, 110, 0.28); }
-  70% { box-shadow: 0 0 0 10px rgba(14, 159, 110, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(14, 159, 110, 0); }
+  0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.28); }
+  70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
+}
+
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slideInUp 0.4s ease-out forwards;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--color-raised) 25%, #E2E8F0 50%, var(--color-raised) 75%);
+  background-size: 200% 100%;
+  animation: skeletonLoading 1.5s infinite;
+}
+
+@keyframes skeletonLoading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }

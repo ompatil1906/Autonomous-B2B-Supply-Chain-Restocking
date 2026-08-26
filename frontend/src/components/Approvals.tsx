@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { CheckCircle2, ChevronDown, ExternalLink, Inbox, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, ExternalLink, Inbox, XCircle, AlertTriangle, FileText, Check } from "lucide-react";
 import { api } from "../lib/api";
 import type { ApprovalRecord, PaymentLink } from "../lib/types";
 import { C, inr } from "../lib/theme";
+import { SectionHeader } from "./live/ui";
 
 /**
  * Real Razorpay links are clickable; simulator links are labelled (they'd 404).
@@ -14,11 +15,11 @@ function LinkButton({ link, onActivate }: { link?: PaymentLink | null; onActivat
   if (link.simulated) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg mono"
+        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg mono"
         title="Created by the offline simulator (remote MCP unreachable) — no live URL exists"
         style={{ background: C.raised, color: C.textLo, border: `1px dashed ${C.hairStrong}`, fontSize: 11 }}
       >
-        simulated link — no live URL
+        Simulated link — no live URL
       </span>
     );
   }
@@ -28,10 +29,10 @@ function LinkButton({ link, onActivate }: { link?: PaymentLink | null; onActivat
         window.open(link.short_url, "_blank", "noopener,noreferrer");
         onActivate?.();
       }}
-      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-opacity hover:opacity-90"
-      style={{ background: C.brassDim, color: C.brass, border: "1px solid rgba(168,127,61,0.4)" }}
+      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg font-medium transition-all hover:-translate-y-0.5"
+      style={{ background: C.brass, color: C.surface, boxShadow: "0 2px 6px rgba(168,127,61,0.2)" }}
     >
-      Open payment link <ExternalLink size={12} />
+      Review & Sign Mandate <ExternalLink size={14} />
     </button>
   );
 }
@@ -96,63 +97,76 @@ export function Approvals({ reloadKey, names }: { reloadKey: number; names?: Rec
       // correctly refused to keep spending. Brass, not red.
       return (
         <span
-          className="ml-2 px-1.5 py-0.5 rounded mono"
+          className="ml-2 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider inline-flex items-center gap-1"
           title={`Every purchase draws from one shared daily block. It is committed for today, so this ${inr(p.total_inr)} reorder waits for you.`}
-          style={{ background: C.brassDim, color: C.brass, fontSize: 11 }}
+          style={{ background: C.brassDim, color: C.brass }}
         >
-          day's ₹1L pool committed
+          <AlertTriangle size={12} /> Day's ₹1L pool committed
         </span>
       );
     }
     return (
-      <span className="ml-2 px-1.5 py-0.5 rounded mono" style={{ background: C.redDim, color: C.red, fontSize: 11 }}>
-        +{inr(p.over_by)} over order cap
+      <span className="ml-2 px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider inline-flex items-center gap-1" style={{ background: C.redDim, color: C.red }}>
+        <XCircle size={12} /> +{inr(p.over_by)} over order cap
       </span>
     );
   };
 
   return (
-    <div className="max-w-4xl mx-auto pt-2 space-y-6">
+    <div className="max-w-4xl mx-auto pt-4 space-y-8">
       <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Inbox size={16} color={C.brass} />
-          <span className="text-sm font-medium" style={{ color: C.textHi }}>
-            Pending approvals
-          </span>
-        </div>
-        <div className="text-xs" style={{ color: C.textLo }}>
-          Purchases the agent refused to make on its own — across every SKU it manages. Approval
-          happens here, through a signed Razorpay link — never by replying to a message.
-        </div>
+        <h1 className="text-2xl font-bold tracking-tight mb-2" style={{ color: C.textHi }}>Approval Inbox</h1>
+        <p className="text-sm max-w-2xl" style={{ color: C.textLo }}>
+          Purchases the agent refused to make autonomously due to gate checks. 
+          Authorizations are completed securely via cryptographic payment links.
+        </p>
       </div>
 
       {pending.length === 0 ? (
-        <div className="rounded-xl p-10 text-center text-sm" style={{ background: C.surface, border: `1px solid ${C.hair}`, color: C.textLo }}>
-          Inbox zero — no escalations waiting.
+        <div 
+          className="rounded-2xl p-16 flex flex-col items-center justify-center text-center" 
+          style={{ 
+            background: C.surface, 
+            border: `1px dashed ${C.hairStrong}`,
+            boxShadow: "inset 0 2px 10px rgba(0,0,0,0.01)" 
+          }}
+        >
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4" style={{ background: C.greenDim }}>
+            <Check size={28} style={{ color: C.green }} />
+          </div>
+          <div className="text-lg font-semibold mb-2" style={{ color: C.textHi }}>Inbox Zero</div>
+          <div className="text-sm max-w-md" style={{ color: C.textLo }}>
+            The agent is operating smoothly within its defined authority limits. 
+            No manual escalations are currently awaiting your review.
+          </div>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <SectionHeader title="ACTION REQUIRED" icon={<Inbox size={14} color={C.brass} />} />
           {pending.map((p) => {
             const capCase = p.reason === "daily_portfolio_cap_exceeded";
             return (
             <div
               key={p.id}
-              className="rounded-xl p-4"
+              className="rounded-2xl p-6 transition-shadow"
               style={{
                 background: C.surface,
                 border: `1px solid ${C.hair}`,
-                borderLeft: `3px solid ${capCase ? C.brass : C.red}`,
+                boxShadow: `0 4px 20px ${capCase ? "rgba(168,127,61,0.08)" : "rgba(220,38,38,0.08)"}`,
+                borderLeft: `4px solid ${capCase ? C.brass : C.red}`,
               }}
             >
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="text-sm" style={{ color: C.textHi }}>
-                  <span className="mono font-medium">{p.sku}</span>
-                  {names?.[p.sku] && (
-                    <span style={{ color: C.textLo }}> · {names[p.sku]}</span>
-                  )}
-                  <span style={{ color: C.textLo }}> × {p.quantity} units · </span>
-                  <span className="mono">{inr(p.total_inr)}</span>
-                  {reasonChip(p)}
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="mono text-lg font-bold" style={{ color: C.textHi }}>{inr(p.total_inr)}</span>
+                    {reasonChip(p)}
+                  </div>
+                  <div className="text-sm" style={{ color: C.textHi }}>
+                    <span className="font-semibold">{names?.[p.sku] ?? "Unknown Product"}</span>
+                    <span style={{ color: C.textLo }}> ({p.sku})</span>
+                    <span style={{ color: C.textLo }}> · {p.quantity} units requested</span>
+                  </div>
                 </div>
                 {/* The real Razorpay link IS the approval — one click opens
                     checkout and resolves the escalation. */}
@@ -162,46 +176,59 @@ export function Approvals({ reloadKey, names }: { reloadKey: number; names?: Rec
                 />
               </div>
 
-              <div className="mt-2 flex items-center justify-between gap-3 text-xs flex-wrap">
+              <div className="mt-5 pt-4 flex items-center justify-between gap-3 text-sm flex-wrap" style={{ borderTop: `1px dashed ${C.hairStrong}` }}>
                 <button
                   onClick={() => setExpanded(expanded === p.id ? null : p.id)}
-                  className="flex items-center gap-1"
+                  className="flex items-center gap-1.5 font-medium hover:opacity-80 transition-opacity"
                   style={{ color: C.textLo }}
                 >
                   <ChevronDown
-                    size={12}
+                    size={16}
                     style={{ transform: expanded === p.id ? "rotate(180deg)" : "none", transition: "transform 200ms" }}
                   />
-                  raised {p.created_at.slice(11, 19)} UTC · ref {p.quote_ref} · view CartMandate
+                  <FileText size={14} /> View CartMandate Payload
                 </button>
                 <button
                   onClick={() => act(p.id, "reject")}
                   disabled={busyId === p.id}
-                  className="underline transition-opacity hover:opacity-70 disabled:opacity-50"
+                  className="font-medium transition-opacity hover:opacity-70 disabled:opacity-50 flex items-center gap-1.5"
                   style={{ color: C.red }}
                 >
-                  Reject this purchase
+                  <XCircle size={14} /> Reject Request
                 </button>
               </div>
 
               {expanded === p.id && (
-                <pre className="json-view mt-2 max-h-64 overflow-auto rounded-lg p-3" style={{ background: C.raised }}>
-                  {JSON.stringify(p.cart_mandate, null, 2)}
-                </pre>
+                <div className="mt-4 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.hair}` }}>
+                  <div className="bg-slate-100 px-4 py-2 text-[10px] font-bold tracking-wider text-slate-500 uppercase border-b border-slate-200">
+                    CartMandate Details
+                  </div>
+                  <pre className="text-[11px] p-4 overflow-x-auto mono max-h-64 overflow-y-auto" style={{ background: "#f8fafc", color: "#334155" }}>
+                    {JSON.stringify(p.cart_mandate, null, 2)}
+                  </pre>
+                </div>
               )}
 
               {notice?.id === p.id && (
                 <div
-                  className="mt-3 rounded-lg p-3 text-xs flex items-center gap-3 flex-wrap"
+                  className="mt-4 rounded-xl p-4 text-sm flex items-start gap-3 flex-wrap"
                   style={{
                     background: notice.ok ? C.greenDim : C.redDim,
                     border: `1px solid ${notice.ok ? "rgba(14,159,110,0.35)" : "rgba(222,76,74,0.35)"}`,
                     color: notice.ok ? C.green : C.red,
                   }}
                 >
-                  {notice.ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
-                  {notice.text}
-                  <LinkButton link={notice.link} />
+                  <div className="mt-0.5">
+                    {notice.ok ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                  </div>
+                  <div className="flex-1 font-medium">
+                    {notice.text}
+                    {notice.link && (
+                      <div className="mt-3">
+                        <LinkButton link={notice.link} />
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -211,40 +238,52 @@ export function Approvals({ reloadKey, names }: { reloadKey: number; names?: Rec
       )}
 
       {error && (
-        <div className="rounded-lg p-3 text-xs" style={{ background: C.redDim, color: C.red, border: `1px solid rgba(222,76,74,0.35)` }}>
+        <div className="rounded-xl p-4 text-sm font-medium flex items-center gap-3" style={{ background: C.redDim, color: C.red, border: `1px solid rgba(222,76,74,0.35)` }}>
+          <AlertTriangle size={18} />
           {error}
         </div>
       )}
 
       {resolved.length > 0 && (
-        <div>
-          <div className="text-sm font-medium mb-2" style={{ color: C.textHi }}>
-            Resolved
-          </div>
-          <div className="space-y-2">
+        <div className="mt-12">
+          <SectionHeader title="RESOLVED HISTORY" icon={<CheckCircle2 size={14} style={{ color: C.textLo }} />} />
+          <div className="space-y-2 mt-4">
             {resolved.map((p) => (
-              <div key={p.id} className="rounded-lg p-3 flex items-center justify-between gap-3 text-xs" style={{ background: C.raised, border: `1px solid ${C.hair}` }}>
-                <span style={{ color: C.textHi }}>
-                  <span className="mono mr-2">{p.sku}</span>
-                  {names?.[p.sku] && <span className="mr-2" style={{ color: C.textLo }}>{names[p.sku]} ·</span>}
-                  {inr(p.total_inr)} · {p.quantity} units
-                </span>
-                <span className="flex items-center gap-3">
+              <div key={p.id} className="rounded-xl p-4 flex items-center justify-between gap-4 text-sm transition-colors hover:bg-slate-50" style={{ background: C.surface, border: `1px solid ${C.hair}` }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: p.status === "approved" ? C.greenDim : C.raised }}>
+                    {p.status === "approved" ? <CheckCircle2 size={14} color={C.green} /> : <XCircle size={14} color={C.textLo} />}
+                  </div>
+                  <div>
+                    <div className="font-semibold" style={{ color: C.textHi }}>
+                      {names?.[p.sku] ?? p.sku}
+                      <span className="font-normal mx-2" style={{ color: C.textLo }}>—</span>
+                      <span className="mono">{inr(p.total_inr)}</span>
+                    </div>
+                    <div className="text-xs mt-0.5" style={{ color: C.textLo }}>
+                      <span className="mono mr-2">{p.sku}</span> · {p.quantity} units requested
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
                   {p.status === "approved" && <LinkButton link={p.resolved_link} />}
-                  <span
-                    className="px-2 py-0.5 rounded-full"
-                    style={
-                      p.status === "approved"
-                        ? { background: C.greenDim, color: C.green }
-                        : { background: C.raised, color: C.textLo, border: `1px solid ${C.hair}` }
-                    }
-                  >
-                    {p.status}
-                  </span>
-                  <span className="mono" style={{ color: C.textLo }}>
-                    {p.resolved_at?.slice(11, 19)}
-                  </span>
-                </span>
+                  <div className="text-right">
+                    <span
+                      className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase rounded-md inline-block mb-1"
+                      style={
+                        p.status === "approved"
+                          ? { background: C.greenDim, color: C.green }
+                          : { background: C.raised, color: C.textLo }
+                      }
+                    >
+                      {p.status}
+                    </span>
+                    <div className="text-[10px] mono" style={{ color: C.textMuted }}>
+                      {p.resolved_at?.slice(11, 19)} UTC
+                    </div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
