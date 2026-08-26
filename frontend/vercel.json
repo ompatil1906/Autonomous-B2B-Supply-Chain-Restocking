@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:match*",
+      "destination": "https://autonomous-b2b-supply-chain-restocking.onrender.com/api/:match*"
+    },
+    {
+      "source": "/ws",
+      "destination": "https://autonomous-b2b-supply-chain-restocking.onrender.com/ws"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

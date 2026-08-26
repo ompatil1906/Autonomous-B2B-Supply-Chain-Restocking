@@ -10,7 +10,8 @@ import type {
   WsEvent,
 } from "./types";
 
-const BASE_URL = import.meta.env.VITE_API_URL || "";
+const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+const BASE_URL = import.meta.env.VITE_API_URL || (isLocal ? "" : "https://autonomous-b2b-supply-chain-restocking.onrender.com");
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(BASE_URL + path);
@@ -60,7 +61,9 @@ export const api = {
 };
 
 export function connectWs(onEvent: (e: WsEvent) => void): () => void {
-  const baseUrl = import.meta.env.VITE_API_URL || `${location.protocol}//${location.host}`;
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const defaultBase = isLocal ? `${location.protocol}//${location.host}` : "https://autonomous-b2b-supply-chain-restocking.onrender.com";
+  const baseUrl = import.meta.env.VITE_API_URL || defaultBase;
   const wsUrl = baseUrl.replace(/^http/, "ws") + "/ws";
   const ws = new WebSocket(wsUrl);
   ws.onmessage = (msg) => {

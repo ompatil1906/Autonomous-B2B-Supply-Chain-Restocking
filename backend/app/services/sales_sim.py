@@ -41,6 +41,12 @@ class SalesSim:
             for sku in EVERGREEN_SKUS:
                 if random.random() < AMBIENT_LAMBDA.get(sku, 0.01) * 3.0:
                     self._on_sale(sku, random.choice([1, 1, 2]))
+            
+            # ensure festival products have a small trickle of sales even when festival is not active
+            if not self.festival_active:
+                for sku in FESTIVAL_SKUS:
+                    if random.random() < 0.015:
+                        self._on_sale(sku, 1)
 
     # ---- festival drop ----
     async def _festival_loop(self, delay_s: float):

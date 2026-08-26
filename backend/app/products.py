@@ -29,17 +29,17 @@ class ProductConfig:
 PRODUCTS: dict[str, ProductConfig] = {
     # ---- evergreen shelf ----
     "SKU-404": ProductConfig(
-        sku="SKU-404", name="Minimal Cotton Tee (Black)", glyph="T",
+        sku="SKU-404", name="Garnier Micellar Water 125ml", glyph="G",
         price_inr=98.0, restock_qty=100, ceiling_inr=10_000.0, max_unit_price_inr=100.0,
         reorder_threshold=20, seed_stock=12,
     ),
     "SKU-101": ProductConfig(
-        sku="SKU-101", name="Oversized Hoodie — Ash", glyph="H",
+        sku="SKU-101", name="Boat Bassheads Earphones", glyph="B",
         price_inr=449.0, restock_qty=40, ceiling_inr=18_000.0, max_unit_price_inr=460.0,
         reorder_threshold=40, seed_stock=140,
     ),
     "SKU-203": ProductConfig(
-        sku="SKU-203", name="Canvas Tote — Natural", glyph="C",
+        sku="SKU-203", name="Nivea Soft Moisturizer 200ml", glyph="N",
         price_inr=199.0, restock_qty=60, ceiling_inr=12_000.0, max_unit_price_inr=210.0,
         reorder_threshold=60, seed_stock=300,
     ),
@@ -47,14 +47,14 @@ PRODUCTS: dict[str, ProductConfig] = {
     # F1 — the predictive star: velocity ramps to 60/min so predictedSecondsToStockout
     # crosses the 90s lead-time at roughly 45% stock, well before the hard floor.
     "SKU-F1": ProductConfig(
-        sku="SKU-F1", name="Festive Kurta — Marigold", glyph="K",
+        sku="SKU-F1", name="Logitech B100 Wired Mouse", glyph="L",
         price_inr=349.0, restock_qty=50, ceiling_inr=18_000.0, max_unit_price_inr=360.0,
         reorder_threshold=30, seed_stock=0, festival=True, launch_stock=200,
         curve=((0, 2.0), (40, 60.0)),
     ),
     # F2 — comfortable mid-seller: also fires predictive, normal executed outcome.
     "SKU-F2": ProductConfig(
-        sku="SKU-F2", name="Diwali Gift Hamper Box", glyph="G",
+        sku="SKU-F2", name="Noise ColorFit Smartwatch", glyph="S",
         price_inr=899.0, restock_qty=15, ceiling_inr=14_000.0, max_unit_price_inr=920.0,
         reorder_threshold=10, seed_stock=0, festival=True, launch_stock=160,
         curve=((0, 3.0), (30, 45.0)),
@@ -63,7 +63,7 @@ PRODUCTS: dict[str, ProductConfig] = {
     # cycles. Tuned so the agent always wins the race: bigger lots (80 @ ₹12k
     # ceiling) + a 15s cooldown keep stock strictly above zero at all times.
     "SKU-F3": ProductConfig(
-        sku="SKU-F3", name="Rangoli Tea-light Set", glyph="R",
+        sku="SKU-F3", name="Cadbury Celebrations Box", glyph="C",
         price_inr=149.0, restock_qty=80, ceiling_inr=12_000.0, max_unit_price_inr=160.0,
         reorder_threshold=25, seed_stock=0, festival=True, launch_stock=160,
         curve=((0, 48.0), (30, 48.0), (32, 100.0)),

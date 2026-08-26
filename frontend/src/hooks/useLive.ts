@@ -134,7 +134,9 @@ export function useLive(onEvent?: (e: any) => void): LiveModel {
 
     const open = () => {
       if (disposed) return;
-      const baseUrl = import.meta.env.VITE_API_URL || `${location.protocol}//${location.host}`;
+      const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const defaultBase = isLocal ? `${location.protocol}//${location.host}` : "https://autonomous-b2b-supply-chain-restocking.onrender.com";
+      const baseUrl = import.meta.env.VITE_API_URL || defaultBase;
       const wsUrl = baseUrl.replace(/^http/, "ws") + "/ws";
       try {
         const ws = new WebSocket(wsUrl);
