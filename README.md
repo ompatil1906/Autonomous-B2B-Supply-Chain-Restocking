@@ -1,7 +1,7 @@
 <div align="center">
   <img src="https://razorpay.com/assets/razorpay-logo.svg" alt="Razorpay Logo" width="200"/>
   <h1>Warden: Autonomous B2B Supply-Chain Restocking</h1>
-  <p><strong>Razorpay Buildathon — Track 01: Explainable, Bounded, Gated AI</strong></p>
+  <p><strong>Razorpay Buildathon — Track 1: AI Growth & Agentic Commerce</strong></p>
 
   <p>
     <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-blue.svg?style=flat&logo=react" alt="React" /></a>
@@ -10,6 +10,12 @@
     <a href="https://python.langchain.com/docs/langgraph/"><img src="https://img.shields.io/badge/LangGraph-Agentic_AI-FF9900.svg?style=flat" alt="LangGraph" /></a>
     <img src="https://img.shields.io/badge/Razorpay-MCP_Server-02042B.svg?style=flat&logo=razorpay" alt="Razorpay MCP" />
   </p>
+
+  <p>
+    <b>🌍 Live Dashboard Demo:</b> <a href="https://warden-ebon.vercel.app">https://warden-ebon.vercel.app</a><br/>
+    <b>⚙️ Backend API Docs:</b> <a href="https://autonomous-b2b-supply-chain-restocking.onrender.com/docs">https://autonomous-b2b-supply-chain-restocking.onrender.com/docs</a>
+  </p>
+  <p><i>Evaluate the agent live! Use the <b>Live Intel & Mission Control</b> tab to trigger autonomous restocks.</i></p>
 </div>
 
 ---
@@ -18,7 +24,7 @@
 
 **Warden** is a production-ready, autonomous B2B supply-chain purchasing agent that eliminates revenue loss from high-velocity stockouts while enforcing a **strict cryptographic financial boundary**.
 
-It is explicitly built for the **Razorpay Buildathon Track 01: Explainable, Bounded, Gated AI**, combining a state-of-the-art merchant intelligence dashboard with an ironclad, mandate-driven payment execution engine via Razorpay's MCP (Model Context Protocol).
+It is explicitly built for the **Razorpay Buildathon Track 1: AI Growth & Agentic Commerce**, combining a state-of-the-art merchant intelligence dashboard with an ironclad, mandate-driven payment execution engine via Razorpay's MCP (Model Context Protocol).
 
 ---
 
@@ -59,6 +65,27 @@ Warden relies on three foundational pillars:
 | **IntentMandate** | Merchant Wallet | Exactly what the human authorized: SKU constraints, quantity caps, unit price ceilings, total budget, expiry. |
 | **CartMandate** | B2B Supplier | Exactly what the supplier promised: SKUs, quantities, and final settlement price. Cryptographically bound to the Intent. |
 | **PaymentMandate** | Agent | Why the agent paid or refused: the executed Razorpay `payment_id` or an `aborted` receipt. |
+
+---
+
+## 🌐 The 3 MCP Servers (Model Context Protocol)
+
+To ensure the agent makes grounded, safe, and explainable decisions, Warden isolates critical capabilities into three distinct **Model Context Protocol (MCP)** integrations:
+
+1. **Razorpay MCP Server (Financial Execution)**
+   - **Role:** Handles the actual movement of money.
+   - **Tools Exposed:** `capture_payment` (auto-debiting the UPI reserve) and `create_payment_link` (escalation to human).
+   - **Why it matters:** The LLM *never* holds payment API keys directly. It only interacts with the standardized Razorpay MCP, which is strictly gated by our cryptographic verifier.
+
+2. **B2B Supplier MCP Server (Procurement & Negotiation)**
+   - **Role:** Exposes the live wholesale catalog and dynamic pricing.
+   - **Tools Exposed:** `get_catalog`, `negotiate_price`, `issue_cart_mandate`.
+   - **Why it matters:** Allows the agent to query real-time stock and haggle prices. When negotiation concludes, the Supplier MCP cryptographically signs the **CartMandate**, locking in the agreed price.
+
+3. **Warehouse & Inventory MCP Server (Live Context)**
+   - **Role:** The agent's eyes on the physical shop floor.
+   - **Tools Exposed:** `get_stock_levels`, `get_sales_velocity`.
+   - **Why it matters:** Feeds the agent real-time telemetry so it can predict stockouts *before* they happen, triggering the LangGraph orchestration pipeline with zero human prompting.
 
 ---
 
