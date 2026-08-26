@@ -10,14 +10,16 @@ import type {
   WsEvent,
 } from "./types";
 
+const BASE_URL = import.meta.env.VITE_API_URL || "";
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+  const res = await fetch(BASE_URL + path);
   if (!res.ok) throw new Error(`${path} → ${res.status}`);
   return res.json();
 }
 
 function post<T>(path: string): Promise<T> {
-  return fetch(path, { method: "POST" }).then(async (r) => {
+  return fetch(BASE_URL + path, { method: "POST" }).then(async (r) => {
     if (!r.ok) throw new Error(`${path} → ${r.status} ${(await r.text()).slice(0, 120)}`);
     return r.json() as Promise<T>;
   });
@@ -36,7 +38,7 @@ export const api = {
   latest: () => get<{ latest: RunResult | null }>("/api/runs/latest"),
   liveState: () => get<LiveState>("/api/live/state"),
   festivalStart: (delayS: number) =>
-    fetch("/api/festival/start", {
+    fetch(BASE_URL + "/api/festival/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ delay_s: delayS }),
@@ -49,7 +51,7 @@ export const api = {
     override_quantity?: number;
     reset_inventory?: boolean;
   }) =>
-    fetch("/api/run", {
+    fetch(BASE_URL + "/api/run", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -57,8 +59,9 @@ export const api = {
 };
 
 export function connectWs(onEvent: (e: WsEvent) => void): () => void {
-  const proto = location.protocol === "https:" ? "wss" : "ws";
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  const baseUrl = import.meta.env.VITE_API_URL || `${location.protocol}//${location.host}`;
+  const wsUrl = baseUrl.replace(/^http/, "ws") + "/ws";
+  const ws = new WebSocket(wsUrl);
   ws.onmessage = (msg) => {
     try {
       onEvent(JSON.parse(msg.data) as WsEvent);

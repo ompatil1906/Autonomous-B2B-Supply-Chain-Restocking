@@ -134,9 +134,10 @@ export function useLive(onEvent?: (e: any) => void): LiveModel {
 
     const open = () => {
       if (disposed) return;
-      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const baseUrl = import.meta.env.VITE_API_URL || `${location.protocol}//${location.host}`;
+      const wsUrl = baseUrl.replace(/^http/, "ws") + "/ws";
       try {
-        const ws = new WebSocket(`${proto}://${location.host}/ws`);
+        const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
         ws.onopen = () => {
           attempt = 0;
