@@ -45,7 +45,7 @@ export default function App() {
       api.inventory(),
       api.audit(),
       api.approvals(),
-      fetch("/api/reserve").then((r) => r.json()),
+      api.reserve(),
     ]);
     setStatus(s);
     setInventory(inv);
@@ -76,11 +76,11 @@ export default function App() {
       .then((r) => r.latest && setResult(r.latest))
       .catch(() => {});
     const check = setInterval(() => {
-      fetch("/api/health")
+      api.health()
         .then(() => setWsState("open"))
         .catch(() => setWsState("closed"));
     }, 5000);
-    fetch("/api/health")
+    api.health()
       .then(() => setWsState("open"))
       .catch(() => setWsState("closed"));
     return () => clearInterval(check);

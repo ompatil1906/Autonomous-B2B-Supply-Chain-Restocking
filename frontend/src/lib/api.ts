@@ -33,6 +33,7 @@ export const api = {
   verifyChain: () => get<VerifyResult>("/api/audit/verify"),
   approvals: () =>
     get<{ pending: ApprovalRecord[]; resolved: ApprovalRecord[] }>("/api/approvals"),
+  reserve: () => get<{ blocks: any[] }>("/api/reserve"),
   approveApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/approve`),
   rejectApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/reject`),
   latest: () => get<{ latest: RunResult | null }>("/api/runs/latest"),
