@@ -17,10 +17,12 @@ import { Approvals } from "./components/Approvals";
 import { LedgerTable } from "./components/LedgerTable";
 import { ConfigureTab } from "./components/ConfigureTab";
 import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
+import { IntroSequence } from "./components/IntroSequence";
 import { useLive } from "./hooks/useLive";
 import { ShieldAlert, PlayCircle, Link2, MessageCircle, CheckCircle2 } from "lucide-react";
 
 export default function App() {
+  const [showIntro, setShowIntro] = useState(true);
   const [tab, setTab] = useState<TabId>("live");
   const [status, setStatus] = useState<SystemStatus | null>(null);
   const [inventory, setInventory] = useState<Inventory | null>(null);
@@ -100,6 +102,10 @@ export default function App() {
     });
     return () => timers.current.forEach(clearTimeout);
   }, [result]);
+
+  if (showIntro) {
+    return <IntroSequence onComplete={() => setShowIntro(false)} />;
+  }
 
   const run = (scenario: string, overrideQuantity?: number) => {
     setBusy(true);

@@ -59,8 +59,8 @@ export function LiveOpsScreen({
       {/* ---------------- top: AI header ---------------- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight" style={{ color: C.textHi }}>
-            Live Intelligence
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: C.textHi }}>
+            Warden Mission Control
           </h1>
           <p className="text-sm mt-1 flex items-center gap-2" style={{ color: C.textLo }}>
             <Activity size={14} className={live.healthy ? "text-green-500 animate-pulse" : "text-amber-500"} />
@@ -71,19 +71,27 @@ export function LiveOpsScreen({
         </div>
       </div>
 
-      <KpiBar
-        ticker={live.ticker}
-        criticalCount={criticalCount}
-        activeRestocks={activeRestocks}
-        budget={live.budget}
-        live={live}
-        onToggleFestival={toggleFestival}
-        busy={festivalBusy}
-      />
+      <div className="mt-8 mb-4">
+        <h2 className="text-sm font-bold tracking-widest uppercase" style={{ color: C.textLo }}>Business Overview</h2>
+        <p className="text-xs mb-4" style={{ color: C.textMuted }}>Live revenue, inventory health, and active stockouts.</p>
+        <KpiBar
+          ticker={live.ticker}
+          criticalCount={criticalCount}
+          activeRestocks={activeRestocks}
+          budget={live.budget}
+          live={live}
+          onToggleFestival={toggleFestival}
+          busy={festivalBusy}
+        />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[58fr_42fr] gap-6 items-start mt-8">
         {/* ---------------- left: shop floor ---------------- */}
         <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-sm font-bold tracking-widest uppercase mb-1" style={{ color: C.textLo }}>Growth Opportunities & Floor</h2>
+            <p className="text-xs mb-4" style={{ color: C.textMuted }}>Live shelf telemetry and active velocity monitoring.</p>
+          </div>
           <FestivalRail products={live.products} snapshots={live.snapshots} />
           
           <ShopFloor
@@ -137,7 +145,12 @@ export function LiveOpsScreen({
         </div>
 
         {/* ---------------- right: agent ops ---------------- */}
-        <AgentOpsPanel
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="text-sm font-bold tracking-widest uppercase mb-1" style={{ color: C.textLo }}>AI Intelligence & Execution</h2>
+            <p className="text-xs mb-4" style={{ color: C.textMuted }}>Warden agent decisions, spending authority, and ledger.</p>
+          </div>
+          <AgentOpsPanel
           budget={live.budget}
           triggers={live.triggers}
           ledgerTail={audit}
@@ -146,6 +159,7 @@ export function LiveOpsScreen({
           onReject={(t) => act(t, "reject")}
           onOpenLedger={onOpenLedger}
         />
+        </div>
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-blue: #2563EB;
-  --color-brand-blue-hover: #1D4ED8;
-  --color-brand-blue-dim: rgba(37, 99, 235, 0.1);
+  --color-brand-blue: #02042B;
+  --color-brand-blue-hover: #121543;
+  --color-brand-blue-dim: rgba(2, 4, 43, 0.06);
+  --color-accent-blue: #2563EB;
   --color-brass: #B45309;
   --color-brass-dim: rgba(180, 83, 9, 0.12);
   --color-green: #059669;
@@ -12,15 +13,16 @@
   --color-red-dim: rgba(220, 38, 38, 0.1);
   --color-amber: #D97706;
   --color-amber-dim: rgba(217, 119, 6, 0.1);
-  --color-bg: #F8F9FB;
+  --color-bg: #FAFAFA;
   --color-surface: #FFFFFF;
-  --color-raised: #F1F3F7;
-  --color-hair: rgba(15, 23, 42, 0.07);
-  --color-hair-strong: rgba(15, 23, 42, 0.14);
-  --color-text-hi: #0F172A;
+  --color-raised: #F4F5F7;
+  --color-hair: rgba(15, 23, 42, 0.06);
+  --color-hair-strong: rgba(15, 23, 42, 0.12);
+  --color-text-hi: #02042B;
   --color-text-lo: #475569;
   --color-text-muted: #94A3B8;
-  --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-card: 0 4px 20px rgba(2, 4, 43, 0.04), 0 1px 3px rgba(2, 4, 43, 0.02);
+  --shadow-float: 0 12px 40px rgba(2, 4, 43, 0.08), 0 4px 12px rgba(2, 4, 43, 0.04);
 }
 
 :root {
@@ -66,12 +68,27 @@ pre.json-view {
 }
 
 @keyframes slideInUp {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .animate-slide-in {
-  animation: slideInUp 0.4s ease-out forwards;
+  animation: slideInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-slide-in {
+    animation: fadeIn 0.4s ease-out forwards;
+  }
 }
 
 .skeleton {

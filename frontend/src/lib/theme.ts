@@ -1,15 +1,16 @@
 import type { CSSProperties } from "react";
 
 export const C = {
-  bg: "#F8F9FB",
+  bg: "#FAFAFA",
   surface: "#FFFFFF",
-  raised: "#F1F3F7",
-  hair: "rgba(15,23,42,0.07)",
-  hairStrong: "rgba(15,23,42,0.14)",
+  raised: "#F4F5F7",
+  hair: "rgba(15,23,42,0.06)",
+  hairStrong: "rgba(15,23,42,0.12)",
   
   // Brand colors
-  blue: "#2563EB",
-  blueDim: "rgba(37,99,235,0.1)",
+  blue: "#02042B",
+  blueDim: "rgba(2,4,43,0.06)",
+  accentBlue: "#2563EB",
   brass: "#B45309",
   brassDim: "rgba(180,83,9,0.12)",
   green: "#059669",
@@ -23,11 +24,12 @@ export const C = {
   heat: "#D97706",
   heatDim: "rgba(217,119,6,0.1)",
   
-  textHi: "#0F172A",
+  textHi: "#02042B",
   textLo: "#475569",
   textMuted: "#94A3B8",
   mono: '"JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace',
-  shadowCard: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)"
+  shadowCard: "0 4px 20px rgba(2,4,43,0.04), 0 1px 3px rgba(2,4,43,0.02)",
+  shadowFloat: "0 12px 40px rgba(2,4,43,0.08), 0 4px 12px rgba(2,4,43,0.04)"
 } as const;
 
 export const STATUS_TONE: Record<string, { fg: string; bg: string; border: string }> = {
