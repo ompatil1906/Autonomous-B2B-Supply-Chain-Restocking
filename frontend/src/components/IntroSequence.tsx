@@ -113,7 +113,37 @@ const SCREENS = [
     )
   },
   {
-    tag: "08 — PRODUCT PREVIEW",
+    tag: "08 — THREE FOUNDATIONAL PILLARS",
+    title: "How Warden wins the Buildathon.",
+    desc: "This project isn't just a UI—it's built on three bleeding-edge architectures that redefine autonomous agentic commerce.",
+    visual: (
+      <div className="flex flex-col gap-4 w-full">
+        <div className="bg-white p-4 rounded shadow-sm border border-blue-200 flex items-start gap-3">
+          <div className="text-blue-500 mt-1">1</div>
+          <div>
+            <div className="font-bold" style={{ color: C.textHi }}>Agentic Intelligence (LangGraph)</div>
+            <div className="text-xs mt-1" style={{ color: C.textLo }}>A stateful, iterative AI agent that predicts stockouts from live velocity data instead of just reacting to them.</div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded shadow-sm border border-amber-200 flex items-start gap-3">
+          <div className="text-amber-500 mt-1">2</div>
+          <div>
+            <div className="font-bold" style={{ color: C.textHi }}>Model Context Protocol (MCP)</div>
+            <div className="text-xs mt-1" style={{ color: C.textLo }}>Three isolated MCP Servers (Warehouse, Supplier, Razorpay) standardize tool access, giving the agent precise operational scope.</div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded shadow-sm border border-green-200 flex items-start gap-3">
+          <div className="text-green-500 mt-1">3</div>
+          <div>
+            <div className="font-bold" style={{ color: C.textHi }}>AP2 Cryptographic Security</div>
+            <div className="text-xs mt-1" style={{ color: C.textLo }}>Deterministic mathematical gates verify every transaction via Ed25519 signatures. The LLM can never hallucinate a rogue payment.</div>
+          </div>
+        </div>
+      </div>
+    )
+  },
+  {
+    tag: "09 — PRODUCT PREVIEW",
     title: "The Live Ops Engine.",
     desc: "You are about to enter the Mission Control dashboard. You will see live telemetry, AI reasoning, and cryptographic payment ledgers.",
     visual: (
@@ -138,7 +168,7 @@ const SCREENS = [
     )
   },
   {
-    tag: "09 — READY TO EXPLORE",
+    tag: "10 — READY TO EXPLORE",
     title: "Your business data is ready.",
     desc: "Let AI turn merchant signals into actionable growth opportunities.",
     visual: null,
