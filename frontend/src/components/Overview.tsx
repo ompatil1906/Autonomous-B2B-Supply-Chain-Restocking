@@ -199,7 +199,7 @@ export function Overview({
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
               style={{ background: C.blue, color: C.surface }}
             >
-              <ShieldCheck size={16} /> Enter Live Intel
+              <ShieldCheck size={16} /> Enter Mission Control
             </button>
           </div>
         </div>

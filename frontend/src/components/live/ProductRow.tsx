@@ -49,12 +49,7 @@ export function ProductRow({
       ? Math.max(0, Math.min(100, (product.currentStock / product.referenceStock) * 100))
       : 0;
 
-  const barColor =
-    product.status === "sold_out" || product.status === "critical" || product.status === "escalated"
-      ? C.red
-      : product.status === "watch"
-        ? C.heat
-        : C.green;
+  const barColor = (product.status === "critical" || product.status === "sold_out" || product.status === "escalated") ? C.red : (product.status === "watch" || product.status === "triggered" || product.status === "restocking") ? C.heat : C.green;
 
   const working = product.status === "triggered" || product.status === "restocking";
   const step = working ? (product.status === "triggered" ? 1 : 4) : 0;

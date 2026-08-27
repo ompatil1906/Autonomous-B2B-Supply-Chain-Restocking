@@ -129,7 +129,7 @@ export function ShopFloor({
               const predRaw = snapshot?.predictedSecondsToStockout;
               const predLeft = predRaw === null || predRaw === undefined ? null : Math.max(0, predRaw - snapshotAgeMs / 1000);
               const pct = p.referenceStock > 0 ? Math.max(0, Math.min(100, (p.currentStock / p.referenceStock) * 100)) : 0;
-              const barColor = p.status === "sold_out" || p.status === "critical" || p.status === "escalated" ? C.red : p.status === "watch" ? C.heat : C.green;
+              const barColor = (p.status === "critical" || p.status === "sold_out" || p.status === "escalated") ? C.red : (p.status === "watch" || p.status === "triggered" || p.status === "restocking") ? C.heat : C.green;
               const isBestSeller = bestSkus.has(p.sku);
 
               return (

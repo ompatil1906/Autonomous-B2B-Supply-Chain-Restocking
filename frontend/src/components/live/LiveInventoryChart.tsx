@@ -42,9 +42,9 @@ const renderCustomizedLabel = (props: any) => {
 };
 
 const getBarColor = (status: string) => {
-  if (status === 'critical' || status === 'sold_out' || status === 'escalated') return '#EF4444'; // red-500
-  if (status === 'watch' || status === 'triggered') return '#F59E0B'; // amber-500
-  return '#10B981'; // green-500
+  if (status === 'critical' || status === 'sold_out' || status === 'escalated') return '#EF4444'; // Red
+  if (status === 'watch' || status === 'triggered' || status === 'restocking') return '#F59E0B'; // Amber
+  return '#10B981'; // Green
 };
 
 export function LiveInventoryChart({ products, snapshots }: { products: ProductView[]; snapshots: Record<string, VelocitySnapshot> }) {
