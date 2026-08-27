@@ -17,7 +17,7 @@ import { Approvals } from "./components/Approvals";
 import { LedgerTable } from "./components/LedgerTable";
 import { ConfigureTab } from "./components/ConfigureTab";
 import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
-import { IntroSequence } from "./components/IntroSequence";
+import { LandingPage } from "./components/LandingPage";
 import { useLive } from "./hooks/useLive";
 import { ShieldAlert, PlayCircle, Link2, MessageCircle, CheckCircle2 } from "lucide-react";
 
@@ -104,7 +104,7 @@ export default function App() {
   }, [result]);
 
   if (showIntro) {
-    return <IntroSequence onComplete={() => setShowIntro(false)} />;
+    return <LandingPage onComplete={() => setShowIntro(false)} />;
   }
 
   const run = (scenario: string, overrideQuantity?: number) => {
@@ -156,7 +156,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-bg)]">
-      <Header wsState={wsState} />
+      <Header wsState={wsState} onHome={() => setShowIntro(true)} />
       <TabBar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
       
       <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative">

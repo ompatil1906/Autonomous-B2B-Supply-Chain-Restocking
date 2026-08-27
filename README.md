@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://razorpay.com/assets/razorpay-logo.svg" alt="Razorpay Logo" width="200"/>
+  <img src="https://razorpay.com/assets/razorpay-logo.png" alt="Razorpay Logo" width="200"/>
   <h1>Warden: Autonomous B2B Supply-Chain Restocking</h1>
   <p><strong>Razorpay Buildathon — Track 1: AI Growth & Agentic Commerce</strong></p>
 

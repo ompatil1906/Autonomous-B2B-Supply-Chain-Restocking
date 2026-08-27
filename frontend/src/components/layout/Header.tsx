@@ -4,8 +4,10 @@ import { C } from "../../lib/theme";
 
 export function Header({
   wsState,
+  onHome,
 }: {
   wsState: "connecting" | "open" | "closed";
+  onHome?: () => void;
 }) {
   const [time, setTime] = useState("");
 
@@ -17,36 +19,36 @@ export function Header({
   }, []);
 
   const pillTone = wsState === "open" ? C.green : wsState === "connecting" ? C.amber : C.red;
-  
+
   return (
-    <header 
+    <header
       className="h-16 flex items-center justify-between px-4 lg:px-6 z-20 shrink-0 sticky top-0"
       style={{ background: C.surface, borderBottom: `1px solid ${C.hair}` }}
     >
       <div className="flex items-center gap-3">
         <div className="flex items-center gap-2.5">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ background: C.brassDim, border: "1px solid rgba(180,83,9,0.4)" }}
-          >
-            <Lock size={15} color={C.brass} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold tracking-wide" style={{ color: C.textHi }}>
-              WARDEN
-            </div>
-            <div className="text-[11px] hidden sm:block" style={{ color: C.textLo }}>
-              Autonomous B2B Restocking Agent
-            </div>
-          </div>
+          <img
+            src="/logo/logo.png"
+            alt="Warden Logo"
+            className="h-10 w-auto object-contain cursor-pointer"
+            onClick={onHome}
+          />
         </div>
+        {onHome && (
+          <button
+            onClick={onHome}
+            className="hidden md:flex ml-4 px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+          >
+            ← Go to Landing Page
+          </button>
+        )}
       </div>
-      
+
       <div className="flex items-center gap-4">
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium" style={{ background: C.raised, color: C.textHi }}>
           Agent Active <span style={{ color: C.textLo }}>· 6 SKUs</span>
         </div>
-        
+
         <div className="flex items-center gap-3">
           <span className="mono text-xs hidden md:block" style={{ color: C.textLo }}>
             {time} IST
