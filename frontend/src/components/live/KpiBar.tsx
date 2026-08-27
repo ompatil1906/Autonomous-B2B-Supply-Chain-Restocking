@@ -1,27 +1,18 @@
 import { useEffect, useState } from "react";
-import { Flame, ShieldAlert, RefreshCcw, Wallet, Sparkles, Square, Rocket } from "lucide-react";
-import { C } from "../../lib/theme";
+import { TrendingUp, ShieldAlert, ShoppingCart, Coins, Cpu } from "lucide-react";
 import type { DailyBudget, Ticker } from "../../lib/types";
 import { fmtCompact } from "../../lib/format";
-import type { LiveModel } from "../../hooks/useLive";
-import { MetricCard } from "../ui/MetricCard";
 
 export function KpiBar({
   ticker,
   criticalCount,
   activeRestocks,
   budget,
-  live,
-  onToggleFestival,
-  busy,
 }: {
   ticker: Ticker;
   criticalCount: number;
   activeRestocks: number;
   budget: DailyBudget;
-  live: LiveModel;
-  onToggleFestival: () => void;
-  busy: boolean;
 }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -30,89 +21,114 @@ export function KpiBar({
   }, []);
 
   const pct = Math.min(100, (budget.spentRupees / budget.ceilingRupees) * 100);
-  const near = pct >= 75;
   const leftToday = Math.max(0, budget.ceilingRupees - budget.spentRupees);
 
-  const dropInS =
-    live.festivalDropAtMs != null ? Math.max(0, (live.festivalDropAtMs - Date.now()) / 1000) : null;
-
   return (
-    <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      {/* units sold */}
-      <MetricCard
-        label="Demand Pulse"
-        value={ticker.unitsLast5m.toLocaleString("en-IN")}
-        icon={<Flame size={16} />}
-        delta={{ value: `${ticker.unitsLast10s} / 10s`, trend: ticker.unitsLast10s > 10 ? "up" : ticker.unitsLast10s === 0 ? "neutral" : "up" }}
-        explanation="Units sold in last 5 min"
-      />
-
-      <MetricCard
-        label="Stockout Risk"
-        value={criticalCount}
-        icon={<ShieldAlert size={16} />}
-        highlight={criticalCount > 0 ? "red" : undefined}
-        explanation={criticalCount > 0 ? "Inside AI lead-time" : "All shelves safe"}
-      />
-
-      <MetricCard
-        label="Active Restocks"
-        value={activeRestocks}
-        icon={<RefreshCcw size={16} />}
-        highlight={activeRestocks > 0 ? "brass" : undefined}
-        explanation={activeRestocks > 0 ? "Gated pipelines running" : "Agent standing by"}
-      />
-
-      <MetricCard
-        label="Budget Authority"
-        value={`₹${fmtCompact(budget.spentRupees)}`}
-        icon={<Wallet size={16} />}
-        highlight={near ? "red" : "brass"}
-        explanation={`₹${fmtCompact(leftToday)} left in pool`}
-      >
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: C.raised }}>
-          <div
-            className="h-full rounded-full transition-all duration-700"
-            style={{ width: `${pct}%`, background: near ? C.red : C.brass }}
-          />
-        </div>
-      </MetricCard>
-
-      {/* festival switch */}
-      <div 
-        className="rounded-xl p-5 relative overflow-hidden flex flex-col justify-between group transition-colors cursor-pointer"
-        style={{ 
-          background: live.festivalActive ? C.redDim : C.greenDim,
-          border: `1px solid ${live.festivalActive ? "rgba(220,38,38,0.3)" : "rgba(5,150,105,0.3)"}`,
-          opacity: busy ? 0.7 : 1
-        }}
-        onClick={onToggleFestival}
-      >
-        <div className="flex justify-between items-start mb-3">
-          <div className="text-[11px] font-semibold tracking-[0.05em] uppercase" style={{ color: live.festivalActive ? C.red : C.green }}>
-            AI Status
+    <div className="mb-6 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-4">
+      {/* 1. Demand Pulse */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <TrendingUp size={16} />
           </div>
-          <div style={{ color: live.festivalActive ? C.red : C.green }}>
-            <Sparkles size={16} />
+          <span className="text-sm font-semibold text-slate-700">Demand Pulse</span>
+        </div>
+        <div className="mt-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-[#1B223C]">
+              {ticker.unitsLast5m.toLocaleString("en-IN")}
+            </span>
+            <span className="text-xs text-slate-500 font-medium">units / 10 min</span>
           </div>
         </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.surface }}>
-            {live.festivalActive ? <Square size={14} color={C.red} /> : <Rocket size={14} color={C.green} />}
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-green-600">
+          <TrendingUp size={14} />
+          <span>{Math.max(1, Math.round((ticker.unitsLast10s / Math.max(1, ticker.unitsLast5m / 30)) * 100))}% vs last 10 min</span>
+        </div>
+      </div>
+
+      {/* 2. Stockout Risk */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <ShieldAlert size={16} />
           </div>
-          <div>
-            <div className="text-sm font-semibold mb-0.5" style={{ color: live.festivalActive ? C.red : C.green }}>
-              {busy ? "Processing…" : live.festivalActive ? "Stop Drop" : "Run Festival Drop"}
-            </div>
-            <div className="text-[10px] opacity-80" style={{ color: live.festivalActive ? C.red : C.green }}>
-              {dropInS != null
-                  ? `launching in ${Math.ceil(dropInS)}s`
-                  : live.festivalActive
-                    ? "drop live — watch the rail"
-                    : "Burst-selling scenario"}
-            </div>
+          <span className="text-sm font-semibold text-slate-700">Stockout Risk</span>
+        </div>
+        <div className="mt-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-[#1B223C]">{criticalCount}</span>
+            <span className="text-xs text-slate-500 font-medium">SKUs at risk</span>
           </div>
+        </div>
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          <div className={`w-2 h-2 rounded-full ${criticalCount > 0 ? "bg-red-500" : "bg-green-500"}`} />
+          {criticalCount > 0 ? <span className="text-red-600">High risk</span> : <span>Low risk</span>}
+        </div>
+      </div>
+
+      {/* 3. Restock Pipeline */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+            <ShoppingCart size={16} />
+          </div>
+          <span className="text-sm font-semibold text-slate-700">Restock Pipeline</span>
+        </div>
+        <div className="mt-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-[#1B223C]">{activeRestocks}</span>
+            <span className="text-xs text-slate-500 font-medium">in progress</span>
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+          <div className="w-2 h-2 rounded-full bg-green-500" />
+          <span className="text-green-600">On track</span>
+        </div>
+      </div>
+
+      {/* 4. Budget Authority */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+            <Coins size={16} />
+          </div>
+          <span className="text-sm font-semibold text-slate-700">Budget Authority</span>
+        </div>
+        <div className="mt-4">
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-2xl font-bold text-[#1B223C]">
+              ₹{Math.round(leftToday).toLocaleString("en-IN")}
+            </span>
+            <span className="text-xs text-slate-500 font-medium">available to use</span>
+          </div>
+        </div>
+        <div className="mt-3">
+          <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="mt-1.5 text-[11px] font-semibold text-slate-500">
+            {Math.round(pct)}% used
+          </div>
+        </div>
+      </div>
+
+      {/* 5. AI Status */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
+            <Cpu size={16} />
+          </div>
+          <span className="text-sm font-semibold text-slate-700">AI Status</span>
+        </div>
+        <div className="mt-4">
+          <span className="text-2xl font-bold text-green-500">
+            Healthy
+          </span>
+        </div>
+        <div className="mt-3 flex flex-col gap-0.5 text-xs text-slate-500 font-medium">
+          <span>All systems operational</span>
+          <span>No alerts</span>
         </div>
       </div>
     </div>

@@ -61,10 +61,12 @@ export function ProductRow({
 
   return (
     <div
-      className="rounded-xl px-5 py-4 transition-shadow duration-200"
+      className="rounded-2xl px-6 py-5 transition-shadow duration-200"
       style={{
         background: C.surface,
-        border: `1px solid ${flash ? "rgba(14,159,110,0.7)" : isBestSeller ? "rgba(180,83,9,0.4)" : C.hair}`,
+        borderTop: `1px solid ${flash ? "rgba(14,159,110,0.7)" : isBestSeller ? "rgba(180,83,9,0.4)" : C.hair}`,
+        borderRight: `1px solid ${flash ? "rgba(14,159,110,0.7)" : isBestSeller ? "rgba(180,83,9,0.4)" : C.hair}`,
+        borderBottom: `1px solid ${flash ? "rgba(14,159,110,0.7)" : isBestSeller ? "rgba(180,83,9,0.4)" : C.hair}`,
         borderLeft: `4px solid ${barColor}`,
         boxShadow: flash
           ? "0 0 0 2px rgba(14,159,110,0.15)"
@@ -90,16 +92,13 @@ export function ProductRow({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="mono text-[11px]" style={{ color: C.textLo }}>
-                {product.sku}
-                {product.festival && " · festival drop"}
-              </span>
-              <span style={{ color: C.textMuted }}>·</span>
-              <span className="text-[11px]" style={{ color: C.textLo }}>
-                Cap: ₹{Math.round(product.reorderCeilingRupees).toLocaleString("en-IN")}
-              </span>
-            </div>
+            {product.festival && (
+              <div className="flex items-center mt-1">
+                <span className="text-[11px] font-medium uppercase tracking-wider" style={{ color: C.heat }}>
+                  Festival Drop
+                </span>
+              </div>
+            )}
           </div>
           <div className="text-right shrink-0 flex items-center gap-4">
             <StatusChip status={product.status} />

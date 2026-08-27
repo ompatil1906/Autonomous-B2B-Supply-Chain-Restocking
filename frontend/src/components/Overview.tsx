@@ -24,7 +24,7 @@ export function Overview({
   const dailyCeiling = status?.ap2_daily_ceiling_inr ?? 100_000;
   const spent = spentToday ?? 0;
   const budgetRemaining = Math.max(0, dailyCeiling - spent);
-  
+
   const lowStocks = inventory?.catalog.filter((s) => s.stock < s.reorder_threshold) ?? [];
 
   return (
@@ -34,7 +34,7 @@ export function Overview({
           Business Intelligence
         </h1>
         <p className="text-sm max-w-2xl" style={{ color: C.textLo }}>
-          Warden predicts stockouts and procures inventory autonomously within strict UPI Reserve Pay boundaries. 
+          Warden predicts stockouts and procures inventory autonomously within strict UPI Reserve Pay boundaries.
           No blank checks, zero missed sales.
         </p>
       </div>
@@ -47,7 +47,7 @@ export function Overview({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {pendingCount > 0 && (
-              <div 
+              <div
                 className="rounded-xl p-5 flex items-start gap-4 transition-transform hover:-translate-y-0.5 cursor-pointer"
                 style={{ background: C.redDim, border: `1px solid rgba(220,38,38,0.3)` }}
                 onClick={onOpenApprovals}
@@ -70,7 +70,7 @@ export function Overview({
             )}
 
             {lowStocks.length > 0 && (
-              <div 
+              <div
                 className="rounded-xl p-5 flex items-start gap-4"
                 style={{ background: C.amberDim, border: `1px solid rgba(217,119,6,0.3)` }}
               >
@@ -124,12 +124,12 @@ export function Overview({
           explanation={`${fmtCompact(budgetRemaining)} remaining in pool`}
         >
           <div className="h-1.5 w-full rounded-full overflow-hidden" style={{ background: C.raised }}>
-            <div 
+            <div
               className="h-full rounded-full transition-all duration-1000"
-              style={{ 
+              style={{
                 width: `${Math.min(100, (spent / dailyCeiling) * 100)}%`,
-                background: C.green 
-              }} 
+                background: C.green
+              }}
             />
           </div>
         </MetricCard>
@@ -150,20 +150,20 @@ export function Overview({
               Agent Activity Stream
             </span>
           </div>
-          
+
           {audit.length === 0 ? (
             <div className="text-sm py-12 text-center flex flex-col items-center justify-center gap-3" style={{ color: C.textLo }}>
               <AlertCircle size={24} style={{ color: C.textMuted }} />
-              <div>No agent activity yet.<br/>Open Live Ops or run a scenario to begin.</div>
+              <div>No agent activity yet.<br />Open Live Ops or run a scenario to begin.</div>
             </div>
           ) : (
             <div className="space-y-3">
               {audit.slice(0, 5).map((r) => (
                 <div key={r.seq} className="flex items-start gap-3 p-3 rounded-lg transition-colors hover:bg-slate-50" style={{ border: `1px solid ${C.hair}` }}>
                   <div className="mt-0.5">
-                    <span 
+                    <span
                       className="inline-flex items-center justify-center rounded text-[10px] font-semibold uppercase tracking-wider px-2 py-1"
-                      style={{ 
+                      style={{
                         background: r.kind === 'escalate' ? C.redDim : r.kind === 'execute' ? C.greenDim : C.raised,
                         color: r.kind === 'escalate' ? C.red : r.kind === 'execute' ? C.green : C.textLo
                       }}
@@ -199,7 +199,7 @@ export function Overview({
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors"
               style={{ background: C.blue, color: C.surface }}
             >
-              <ShieldCheck size={16} /> Enter Mission Control
+              <ShieldCheck size={16} /> Enter Live Intel
             </button>
           </div>
         </div>

@@ -1,9 +1,6 @@
-import { useState } from "react";
-import { ArrowRight, Gavel, Lock, ReceiptText, ShieldAlert } from "lucide-react";
-import { C } from "../../lib/theme";
+import { ArrowRight, ShieldAlert } from "lucide-react";
+import { C, inr } from "../../lib/theme";
 import type { AgentTrigger, AuditRecord, DailyBudget } from "../../lib/types";
-import { TriggerCard } from "./TriggerCard";
-import { SectionHeader } from "./ui";
 import { KIND_LABELS } from "../../lib/format";
 
 export function AgentOpsPanel({
@@ -25,153 +22,103 @@ export function AgentOpsPanel({
 }) {
   const pct = Math.min(100, (budget.spentRupees / budget.ceilingRupees) * 100);
   const breached = triggers.some(
-    (t) =>
-      t.outcome === "escalated" &&
-      t.gate?.checks?.some((c) => c.name === "daily_portfolio_cap" && !c.passed),
+    (t) => t.outcome === "escalated" && t.gate?.checks?.some((c) => c.name === "daily_portfolio_cap" && !c.passed),
   );
-  const leverState: "idle" | "closed" | "tripped" =
-    breached ? "tripped" : budget.spentRupees > 0 ? "closed" : "idle";
 
   return (
-    <div className="flex flex-col gap-6 min-h-0">
-      {/* daily authority */}
+    <div className="flex flex-col gap-10 min-h-0">
+      {/* Sleek Budget Progress */}
       <div>
-        <SectionHeader
-          title="AUTONOMOUS OPERATIONS"
-          icon={<Gavel size={14} color={C.brass} />}
-          right={
-            <span className="text-[10px]" style={{ color: C.textLo }}>
-              Live execution feed
-            </span>
-          }
-        />
-        <div className="rounded-xl p-5" style={{ background: C.surface, border: `1px solid ${C.hair}`, boxShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)" }}>
-          <div className="flex items-center justify-between mb-4">
-            <span className="flex items-center gap-2 text-[12px] font-semibold tracking-wide uppercase" style={{ color: C.textLo }}>
-              <Lock size={14} color={C.brass} /> Spending Authority
-            </span>
-            <span
-              className="text-[10px] px-2.5 py-1 rounded-full font-semibold tracking-wide uppercase"
-              style={{
-                color: leverState === "tripped" ? C.red : leverState === "closed" ? C.green : C.textLo,
-                background: leverState === "tripped" ? C.redDim : leverState === "closed" ? C.greenDim : C.raised,
-              }}
-            >
-              {leverState === "tripped" ? "Tripped" : leverState === "closed" ? "Engaged" : "Standing By"}
-            </span>
-          </div>
-
-          <div className="flex items-baseline gap-2">
-            <span
-              className="mono text-2xl font-semibold leading-none tracking-tight"
-              style={{ color: breached || pct >= 90 ? C.red : C.textHi }}
-            >
+        <div className="flex justify-between items-end mb-2">
+          <div className="text-sm font-semibold uppercase tracking-wide" style={{ color: C.textLo }}>Daily Budget</div>
+          <div className="text-sm mono">
+            <span className="font-semibold" style={{ color: breached || pct >= 90 ? C.red : C.textHi }}>
               ₹{Math.round(budget.spentRupees).toLocaleString("en-IN")}
             </span>
-            <span className="mono text-sm" style={{ color: C.textLo }}>
-              / ₹{Math.round(budget.ceilingRupees).toLocaleString("en-IN")}
-            </span>
+            <span style={{ color: C.textMuted }}> / ₹{Math.round(budget.ceilingRupees).toLocaleString("en-IN")}</span>
           </div>
-
-          <div className="h-2 rounded-full overflow-hidden mt-3" style={{ background: C.raised }}>
-            <div
-              className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, background: breached || pct >= 90 ? C.red : C.brass }}
-            />
-          </div>
-
-          <div className="flex justify-between items-center mt-2.5 text-xs">
-            <span style={{ color: C.textLo }}>
-              Resets at midnight IST
-            </span>
-            <span className="font-medium" style={{ color: breached ? C.red : C.textHi }}>
-              ₹{Math.round(Math.max(0, budget.ceilingRupees - budget.spentRupees)).toLocaleString("en-IN")} left
-            </span>
-          </div>
-
-          {breached && (
-            <div className="mt-4 text-xs rounded-lg pl-3 pr-2 py-2.5 leading-snug flex items-start gap-2" style={{ background: C.redDim, color: C.red, borderLeft: `3px solid ${C.red}` }}>
-              <ShieldAlert size={14} className="shrink-0 mt-0.5" />
-              Agent attempted purchase that exceeded the daily ceiling. Purchase escalated for manual review.
-            </div>
-          )}
         </div>
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: C.raised }}>
+          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: breached || pct >= 90 ? C.red : C.brass }} />
+        </div>
+        {breached && (
+          <div className="mt-3 text-[11px] font-medium rounded-md px-2 py-1.5 flex items-center gap-2" style={{ background: C.redDim, color: C.red, borderLeft: `2px solid ${C.red}` }}>
+            <ShieldAlert size={12} /> Daily ceiling exceeded. Escalated for review.
+          </div>
+        )}
       </div>
 
-      {/* trigger feed */}
+      {/* Agent Action Log Table */}
       <div>
-        <SectionHeader
-          title={`AGENT DECISIONS — ${triggers.length} TODAY`}
-          icon={<ReceiptText size={14} style={{ color: C.textLo }} />}
-        />
-        <div className="space-y-3 overflow-y-auto pr-1" style={{ maxHeight: "calc(100vh - 480px)" }}>
-          {triggers.map((t) => (
-            <TriggerCard
-              key={t.id}
-              trigger={t}
-              onApprove={onApprove}
-              onReject={onReject}
-              actionBusy={actionBusy}
-            />
-          ))}
-          {!triggers.length && (
-            <div
-              className="rounded-xl py-10 text-center text-sm flex flex-col items-center justify-center gap-2"
-              style={{ background: C.surface, border: `1px dashed ${C.hairStrong}`, color: C.textLo }}
-            >
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: C.raised }}>
-                <ReceiptText size={18} style={{ color: C.textMuted }} />
-              </div>
-              <div>
-                <span className="font-medium text-slate-600 block mb-1">No autonomous decisions yet</span>
-                <span className="text-xs">Agent will act when velocity predicts a stockout.</span>
-              </div>
-            </div>
-          )}
+        <div className="text-sm font-semibold uppercase tracking-wide mb-3" style={{ color: C.textLo }}>Agent Action Log</div>
+        <div className="rounded-xl overflow-hidden" style={{ background: C.surface, border: `1px solid ${C.hair}` }}>
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead style={{ background: C.raised, borderBottom: `1px solid ${C.hair}` }}>
+              <tr>
+                <th className="px-4 py-2 font-medium text-[10px] uppercase tracking-wider" style={{ color: C.textMuted }}>Time</th>
+                <th className="px-4 py-2 font-medium text-[10px] uppercase tracking-wider" style={{ color: C.textMuted }}>SKU</th>
+                <th className="px-4 py-2 font-medium text-[10px] uppercase tracking-wider" style={{ color: C.textMuted }}>Action</th>
+                <th className="px-4 py-2 font-medium text-[10px] uppercase tracking-wider text-right" style={{ color: C.textMuted }}>Cost</th>
+                <th className="px-4 py-2 font-medium text-[10px] uppercase tracking-wider text-right" style={{ color: C.textMuted }}>Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y" style={{ borderColor: C.hair }}>
+              {triggers.map((t) => {
+                const isEscalated = t.outcome === "escalated";
+                const isFailed = t.outcome === "failed";
+                const isSuccess = t.outcome === "executed";
+                const statusColor = isEscalated || isFailed ? C.red : isSuccess ? C.green : C.brass;
+                return (
+                  <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-2.5 mono text-[10px]" style={{ color: C.textLo }}>
+                      {new Date(t.triggeredAtMs).toLocaleTimeString("en-IN", { hour12: false })}
+                    </td>
+                    <td className="px-4 py-2.5 mono text-[11px]" style={{ color: C.textHi }}>
+                      {t.sku.replace("SKU-", "")}
+                    </td>
+                    <td className="px-4 py-2.5 text-[11px]" style={{ color: C.textLo }}>
+                      {t.quantity ? `Purchased ${t.quantity} units` : "Checking stock"}
+                    </td>
+                    <td className="px-4 py-2.5 mono text-[11px] text-right" style={{ color: C.textHi }}>
+                      {t.amountInr ? inr(t.amountInr) : "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className="text-[10px] font-medium uppercase px-2 py-0.5 rounded-full" style={{ color: statusColor, background: isEscalated || isFailed ? C.redDim : isSuccess ? C.greenDim : C.brassDim }}>
+                        {t.outcome.replace("_", " ")}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!triggers.length && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-[11px]" style={{ color: C.textMuted }}>
+                    No autonomous actions yet today.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* hash-chain tail */}
-      <LedgerTail records={ledgerTail} onOpenLedger={onOpenLedger} />
-    </div>
-  );
-}
-
-function LedgerTail({ records, onOpenLedger }: { records: AuditRecord[]; onOpenLedger: () => void }) {
-  const [hover, setHover] = useState<number | null>(null);
-  return (
-    <div className="rounded-xl p-4" style={{ background: C.surface, border: `1px solid ${C.hair}` }}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: C.textLo }}>
-          Tamper-Evident Ledger
-        </span>
-        <button
-          onClick={onOpenLedger}
-          className="inline-flex items-center gap-1 text-[11px] font-medium hover:opacity-80 transition-opacity"
-          style={{ color: C.brass }}
-        >
-          View Full Chain <ArrowRight size={12} />
-        </button>
-      </div>
-      <div className="space-y-0.5">
-        {records.slice(0, 5).map((r) => (
-          <div
-            key={r.seq}
-            onMouseEnter={() => setHover(r.seq)}
-            onMouseLeave={() => setHover(null)}
-            className="flex items-center gap-3 mono text-[11px] px-2 py-1.5 rounded-lg cursor-default transition-colors"
-            style={{ background: hover === r.seq ? C.raised : "transparent" }}
-            title={`seq #${r.seq} · prev ${r.prev_hash?.slice(0, 16)}… → hash ${r.hash?.slice(0, 16)}…`}
-          >
-            <span style={{ color: C.textMuted, width: 24 }}>#{r.seq}</span>
-            <span className="truncate font-medium" style={{ color: C.textHi }}>
-              {KIND_LABELS[r.kind] ?? r.kind}
-            </span>
-            <span className="ml-auto truncate opacity-70" style={{ color: C.textLo }}>
-              {r.hash?.slice(0, 8)}…
-            </span>
-          </div>
-        ))}
+      {/* Hash-chain tail (Minimal) */}
+      <div className="mt-2">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.textLo }}>Tamper-Evident Ledger</span>
+          <button onClick={onOpenLedger} className="inline-flex items-center gap-1 text-[10px] font-medium hover:opacity-80 transition-opacity" style={{ color: C.brass }}>
+            View Full <ArrowRight size={10} />
+          </button>
+        </div>
+        <div className="font-mono text-[10px] space-y-1.5 p-3 rounded-lg" style={{ background: "#FAFAFA", border: `1px solid ${C.hair}` }}>
+          {ledgerTail.slice(0, 5).map((r) => (
+            <div key={r.seq} className="flex items-center gap-3" style={{ color: C.textLo }}>
+              <span className="w-8 opacity-50">#{r.seq}</span>
+              <span className="w-36 truncate">{KIND_LABELS[r.kind] ?? r.kind}</span>
+              <span className="opacity-40">{r.hash?.slice(0, 16)}…</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

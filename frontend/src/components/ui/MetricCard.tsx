@@ -33,11 +33,18 @@ export function MetricCard({
 
   return (
     <div 
-      className="rounded-xl p-5 relative overflow-hidden animate-slide-in" 
-      style={{ ...card(), borderTop: highlight ? `3px solid ${getHighlightColor()}` : card().border }}
+      className="rounded-2xl p-6 relative overflow-hidden animate-slide-in flex flex-col justify-between min-h-[140px]" 
+      style={{ 
+        background: C.surface,
+        boxShadow: C.shadowCard,
+        borderBottom: `1px solid transparent`,
+        borderLeft: `1px solid transparent`,
+        borderRight: `1px solid transparent`,
+        borderTop: highlight ? `4px solid ${getHighlightColor()}` : `1px solid transparent` 
+      }}
     >
-      <div className="flex justify-between items-start mb-3">
-        <div className="text-[11px] font-semibold tracking-[0.05em] uppercase" style={{ color: C.textLo }}>
+      <div className="flex justify-between items-start mb-2">
+        <div className="text-sm font-medium" style={{ color: C.textLo }}>
           {label}
         </div>
         {icon && (
@@ -47,12 +54,12 @@ export function MetricCard({
         )}
       </div>
       
-      <div className="flex items-baseline gap-3">
-        <div className="text-3xl font-semibold mono tracking-tight" style={{ color: C.textHi }}>
+      <div className="flex items-baseline gap-3 mt-auto">
+        <div className="text-4xl font-semibold tracking-tight" style={{ color: C.textHi }}>
           {value}
         </div>
         {delta && (
-          <div className="text-xs font-medium mono px-1.5 py-0.5 rounded-md" style={{ color: deltaColor, background: deltaColor === C.green ? C.greenDim : deltaColor === C.red ? C.redDim : C.raised }}>
+          <div className="text-sm font-medium" style={{ color: deltaColor }}>
             {delta.trend === "up" ? "↑" : delta.trend === "down" ? "↓" : ""} {delta.value}
           </div>
         )}

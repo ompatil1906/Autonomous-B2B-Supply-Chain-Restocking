@@ -8,7 +8,8 @@ import { C, inr } from "./lib/theme";
 
 // Components
 import { Header } from "./components/layout/Header";
-import { TabBar, TabId } from "./components/layout/TabBar";
+import { Sidebar } from "./components/layout/Sidebar";
+import type { TabId } from "./components/layout/TabBar";
 import { Breaker } from "./components/Breaker";
 import { MandateSeal } from "./components/MandateSeal";
 import { Console } from "./components/Console";
@@ -19,7 +20,7 @@ import { ConfigureTab } from "./components/ConfigureTab";
 import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
 import { LandingPage } from "./components/LandingPage";
 import { useLive } from "./hooks/useLive";
-import { ShieldAlert, PlayCircle, Link2, MessageCircle, CheckCircle2 } from "lucide-react";
+import { ShieldAlert, PlayCircle, Link2, MessageCircle, CheckCircle2, Sparkles } from "lucide-react";
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -154,19 +155,34 @@ export default function App() {
 
   const lowStocks = inventory?.catalog.filter((s) => s.stock < s.reorder_threshold) ?? [];
 
+  const getHeaderInfo = (tabId: TabId) => {
+    switch (tabId) {
+      case "overview": return { title: "Business Intel", subtitle: "System status and performance metrics" };
+      case "live": return { title: "Live Intel", subtitle: "Real-time overview of your restocking operations" };
+      case "mission": return { title: "Mission Control", subtitle: "Agent reasoning and execution trace" };
+      case "approvals": return { title: "Approvals", subtitle: "Pending escalations and manual overrides" };
+      case "ledger": return { title: "Audit Trail", subtitle: "Immutable record of all agent actions" };
+      case "configure": return { title: "Configuration", subtitle: "System constraints and behavior settings" };
+      default: return { title: "Mission Control", subtitle: "Real-time overview of your restocking operations" };
+    }
+  };
+
+  const headerInfo = getHeaderInfo(tab);
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[var(--color-bg)]">
-      <Header wsState={wsState} onHome={() => setShowIntro(true)} />
-      <TabBar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
+    <div className="flex h-screen overflow-hidden bg-[#F8F9FB]">
+      <Sidebar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
       
-      <main className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
-        {/* Floating Demo Controls for presentation */}
-        <div className="fixed bottom-6 right-6 z-50 w-72 bg-white rounded-2xl p-4 shadow-2xl shadow-black/10 border border-slate-200">
-          <div className="text-[10px] font-bold tracking-widest mb-3 text-slate-400">
-            PRESENTER TOOLS
-          </div>
-          <DemoControls live={live} />
-        </div>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        <Header 
+          title={headerInfo.title}
+          subtitle={headerInfo.subtitle}
+          wsState={wsState} 
+          onHome={() => setShowIntro(true)} 
+        />
+        
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 relative">
+        <FloatingPresenterTools live={live} />
 
         <div className="max-w-[1400px] mx-auto animate-slide-in pb-24">
             {tab === "live" && (
@@ -174,6 +190,7 @@ export default function App() {
                 live={live}
                 audit={audit}
                 onOpenLedger={() => setTab("ledger")}
+                onOpenOverview={() => setTab("overview")}
                 onApprovalsChanged={() => refresh().catch(console.error)}
               />
             )}
@@ -376,6 +393,7 @@ export default function App() {
             )}
           </div>
         </main>
+      </div>
     </div>
   );
 }
@@ -409,7 +427,38 @@ function ScenarioBtn({
   );
 }
 
-/** Demo controls moved to a separate component to render inside the sidebar */
+function FloatingPresenterTools({ live }: { live: ReturnType<typeof useLive> }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  if (!isOpen) {
+    return (
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-[#1B223C] text-white rounded-full shadow-xl hover:bg-slate-800 transition-transform hover:-translate-y-1 font-bold text-xs"
+      >
+        <Sparkles size={14} /> Presenter Tools
+      </button>
+    );
+  }
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50 w-72 bg-white rounded-2xl p-4 shadow-2xl shadow-black/10 border border-slate-200 animate-in slide-in-from-bottom-5">
+      <div className="flex justify-between items-center mb-3">
+        <div className="text-[10px] font-bold tracking-widest text-slate-400">
+          PRESENTER TOOLS
+        </div>
+        <button 
+          onClick={() => setIsOpen(false)}
+          className="p-1 hover:bg-slate-100 rounded text-slate-500"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <DemoControls live={live} />
+    </div>
+  );
+}
+
 function DemoControls({ live }: { live: ReturnType<typeof useLive> }) {
   const [festivalBusy, setFestivalBusy] = useState(false);
   const [probeBusy, setProbeBusy] = useState(false);
@@ -441,34 +490,32 @@ function DemoControls({ live }: { live: ReturnType<typeof useLive> }) {
     : ["SKU-404", "SKU-101", "SKU-203"];
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <button
         onClick={toggleFestival}
         disabled={festivalBusy}
-        className="w-full flex items-center gap-2 text-xs px-3 py-2.5 rounded-lg disabled:opacity-40 hover:opacity-90 transition-opacity font-medium"
-        style={{
-          background: live.festivalActive ? C.redDim : C.greenDim,
-          color: live.festivalActive ? C.red : C.green,
-          border: `1px solid ${live.festivalActive ? "rgba(220,38,38,0.3)" : "rgba(5,150,105,0.3)"}`,
-        }}
+        className={`w-full flex justify-center items-center gap-2 text-[13px] px-4 py-3 rounded-xl disabled:opacity-50 hover:-translate-y-0.5 transition-all font-bold shadow-sm ${
+          live.festivalActive 
+            ? "bg-red-500 text-white hover:bg-red-600 hover:shadow-red-500/20" 
+            : "bg-[#1B223C] text-white hover:bg-slate-800 hover:shadow-slate-800/20"
+        }`}
       >
-        {live.festivalActive ? <Square size={13} /> : <Rocket size={13} />}
-        {festivalBusy ? "…" : live.festivalActive ? "Stop drop" : "Start drop (10s)"}
+        {live.festivalActive ? <Square size={14} fill="currentColor" /> : <Rocket size={14} />}
+        {festivalBusy ? "Processing..." : live.festivalActive ? "Stop Simulation" : "Simulate Festival Drop (10s)"}
       </button>
 
-      <div>
-        <div className="text-[10px] mb-1.5" style={{ color: C.textLo }}>
-          Force a SKU through pipeline:
+      <div className="pt-2 border-t border-slate-100">
+        <div className="text-[11px] font-semibold text-slate-500 mb-2">
+          FORCE RESTOCK TRIGGER:
         </div>
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-2">
           {skus.map((sku) => (
             <button
               key={sku}
               disabled={probeBusy}
               onClick={() => probe(sku)}
-              className="mono text-[10px] px-2 py-1 rounded disabled:opacity-40 hover:opacity-80 transition-opacity"
-              style={{ background: C.raised, color: C.textHi, border: `1px solid ${C.hair}` }}
-              title={`manual probe — ${sku}`}
+              className="font-mono text-[10px] px-2.5 py-1.5 rounded-md disabled:opacity-40 hover:bg-slate-50 transition-colors bg-white border border-slate-200 text-slate-700 shadow-sm font-semibold hover:border-slate-300"
+              title={`Trigger manual restock for ${sku}`}
             >
               {sku.replace("SKU-", "")}
             </button>
@@ -476,8 +523,9 @@ function DemoControls({ live }: { live: ReturnType<typeof useLive> }) {
         </div>
       </div>
       
-      <div className="text-[10px] leading-relaxed p-2 rounded bg-slate-50 text-slate-500 mt-2">
-        Tip: run the festival drop twice to exhaust the ₹1 lakh daily pool and watch the portfolio-cap escalation fire live.
+      <div className="text-[10.5px] leading-relaxed p-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 mt-1 font-medium">
+        <span className="font-bold block mb-1">PRO TIP</span>
+        Run the festival drop twice to exhaust the ₹1 lakh daily pool and watch the portfolio-cap escalation fire live.
       </div>
     </div>
   );
