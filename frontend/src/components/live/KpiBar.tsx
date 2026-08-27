@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { TrendingUp, ShieldAlert, ShoppingCart, Coins, Cpu } from "lucide-react";
 import type { DailyBudget, Ticker } from "../../lib/types";
-import { fmtCompact } from "../../lib/format";
 
 export function KpiBar({
   ticker,

@@ -1,4 +1,4 @@
-import { ChevronDown, BarChart2 } from "lucide-react";
+import { BarChart2 } from "lucide-react";
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from "recharts";
 import type { ProductView, VelocitySnapshot } from "../../lib/types";
 

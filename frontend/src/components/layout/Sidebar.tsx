@@ -1,14 +1,10 @@
 import {
   LayoutDashboard,
   Activity,
-  BarChart2,
-  Users,
-  ShoppingCart,
-  CreditCard,
-  CheckSquare,
-  FileText,
   Settings,
-  ShieldCheck
+  BarChart2,
+  CheckSquare,
+  FileText
 } from "lucide-react";
 import { C } from "../../lib/theme";
 import type { TabId } from "./TabBar";
@@ -21,7 +17,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "overview", label: "Business Intel", icon: BarChart2 },
+  { id: "overview", label: "Business Intel", icon: BarChart2 }, // Force HMR
   { id: "live", label: "Live Intel", icon: LayoutDashboard },
   { id: "mission", label: "Mission Control", icon: Activity },
   { id: "approvals", label: "Approvals", icon: CheckSquare },

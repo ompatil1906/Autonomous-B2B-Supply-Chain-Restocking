@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Zap, Timer, Flame, Trophy, Package } from "lucide-react";
+import { Zap, Trophy } from "lucide-react";
 import { C } from "../../lib/theme";
 import type { ProductView, VelocitySnapshot } from "../../lib/types";
 import { StatusChip } from "./ui";
@@ -17,14 +17,12 @@ export function ShopFloor({
   products,
   snapshots,
   snapshotAt,
-  lastSaleAt,
   ticker,
   connected,
 }: {
   products: ProductView[];
   snapshots: Record<string, VelocitySnapshot>;
   snapshotAt: Record<string, number>;
-  lastSaleAt: Record<string, number>;
   ticker: { unitsLast10s: number; unitsLast5m: number };
   connected: boolean;
 }) {
@@ -139,8 +137,8 @@ export function ShopFloor({
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-xs" style={{ color: C.textHi }}>{p.name}</span>
-                      {isBestSeller && <Trophy size={11} color={C.brass} title="Best Seller" />}
-                      {p.festival && <Zap size={11} color={C.heat} title="Festival Drop" />}
+                      {isBestSeller && <span title="Best Seller"><Trophy size={11} color={C.brass} /></span>}
+                      {p.festival && <span title="Festival Drop"><Zap size={11} color={C.heat} /></span>}
                     </div>
                   </td>
                   <td className="px-4 py-2.5 text-right">

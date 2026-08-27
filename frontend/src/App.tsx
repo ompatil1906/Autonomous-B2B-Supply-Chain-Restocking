@@ -191,7 +191,6 @@ export default function App() {
                 audit={audit}
                 onOpenLedger={() => setTab("ledger")}
                 onOpenOverview={() => setTab("overview")}
-                onApprovalsChanged={() => refresh().catch(console.error)}
               />
             )}
 

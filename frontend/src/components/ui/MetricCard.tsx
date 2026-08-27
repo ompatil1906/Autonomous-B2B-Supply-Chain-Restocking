@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { C, card } from "../../lib/theme";
+import { C } from "../../lib/theme";
 
 export function MetricCard({
   label,

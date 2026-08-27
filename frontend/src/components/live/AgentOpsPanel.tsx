@@ -7,17 +7,11 @@ export function AgentOpsPanel({
   budget,
   triggers,
   ledgerTail,
-  onApprove,
-  onReject,
-  actionBusy,
   onOpenLedger,
 }: {
   budget: DailyBudget;
   triggers: AgentTrigger[];
   ledgerTail: AuditRecord[];
-  onApprove: (t: AgentTrigger) => void;
-  onReject: (t: AgentTrigger) => void;
-  actionBusy: boolean;
   onOpenLedger: () => void;
 }) {
   const pct = Math.min(100, (budget.spentRupees / budget.ceilingRupees) * 100);

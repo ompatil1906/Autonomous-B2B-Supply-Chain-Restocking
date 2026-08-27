@@ -1,14 +1,12 @@
-import { AlertCircle, AlertTriangle, Box, Loader2 } from "lucide-react";
-import type { AgentTrigger, ProductView, VelocitySnapshot } from "../../lib/types";
+import { AlertCircle, AlertTriangle, Box } from "lucide-react";
+import type { ProductView, VelocitySnapshot } from "../../lib/types";
 
 export function AiRecommendations({ 
   products, 
   snapshots,
-  act 
 }: { 
   products: ProductView[]; 
   snapshots: Record<string, VelocitySnapshot>;
-  act: (t: AgentTrigger, kind: "approve" | "reject") => Promise<void>;
 }) {
   const recommendations = products.filter(p => p.status === 'watch' || p.status === 'critical' || p.status === 'escalated');
 
