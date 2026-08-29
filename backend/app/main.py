@@ -114,7 +114,7 @@ async def _run_scenario(req: RunRequest) -> dict:
     return result
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health() -> dict:
     return {"ok": True, "razorpay_mode": settings.razorpay_mode, "llm_provider": settings.agent_llm_provider}
 
