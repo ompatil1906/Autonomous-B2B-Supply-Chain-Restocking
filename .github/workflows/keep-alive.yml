@@ -1,0 +1,16 @@
+name: Keep Backend Alive
+
+on:
+  schedule:
+    - cron: "*/5 * * * *" # Runs every 5 minutes
+  workflow_dispatch: # Allows manual triggering from the GitHub UI
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Render Backend
+        run: |
+          echo "Pinging backend health endpoint..."
+          curl -sSf https://autonomous-b2b-supply-chain-restocking.onrender.com/api/health > /dev/null
+          echo "Success! Backend is awake."
