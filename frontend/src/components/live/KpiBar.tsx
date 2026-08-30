@@ -1,17 +1,24 @@
 import { useEffect, useState } from "react";
-import { TrendingUp, ShieldAlert, ShoppingCart, Coins, Cpu } from "lucide-react";
+import { TrendingUp, ShieldAlert, ShoppingCart, Coins, Radio } from "lucide-react";
 import type { DailyBudget, Ticker } from "../../lib/types";
+import { C } from "../../lib/theme";
 
 export function KpiBar({
   ticker,
   criticalCount,
   activeRestocks,
   budget,
+  connected,
+  healthy,
+  mode,
 }: {
   ticker: Ticker;
   criticalCount: number;
   activeRestocks: number;
   budget: DailyBudget;
+  connected: boolean;
+  healthy: boolean;
+  mode?: string;
 }) {
   const [, tick] = useState(0);
   useEffect(() => {
@@ -37,12 +44,12 @@ export function KpiBar({
             <span className="text-2xl font-bold text-[#1B223C]">
               {ticker.unitsLast5m.toLocaleString("en-IN")}
             </span>
-            <span className="text-xs text-slate-500 font-medium">units / 10 min</span>
+            <span className="text-xs text-slate-500 font-medium">units / last 5 min</span>
           </div>
         </div>
-        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-green-600">
+        <div className="mt-3 flex items-center gap-1.5 text-xs font-semibold" style={{ color: ticker.unitsLast10s > 0 ? C.green : C.textLo }}>
           <TrendingUp size={14} />
-          <span>{Math.max(1, Math.round((ticker.unitsLast10s / Math.max(1, ticker.unitsLast5m / 30)) * 100))}% vs last 10 min</span>
+          <span>{Math.max(0, Math.round((ticker.unitsLast10s / Math.max(1, ticker.unitsLast5m / 30)) * 100))}% of 5-min rate (last 10 s)</span>
         </div>
       </div>
 
@@ -112,22 +119,25 @@ export function KpiBar({
         </div>
       </div>
 
-      {/* 5. AI Status */}
+      {/* 5. Telemetry status */}
       <div className="bg-white rounded-xl p-5 border border-slate-200 shadow-sm flex flex-col justify-between h-full min-h-[140px]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-            <Cpu size={16} />
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center"
+            style={{ background: connected ? C.greenDim : C.amberDim, color: connected ? C.green : C.amber }}
+          >
+            <Radio size={16} />
           </div>
-          <span className="text-sm font-semibold text-slate-700">AI Status</span>
+          <span className="text-sm font-semibold text-slate-700">Telemetry</span>
         </div>
         <div className="mt-4">
-          <span className="text-2xl font-bold text-green-500">
-            Healthy
+          <span className="text-xl font-bold" style={{ color: connected ? C.textHi : C.amber }}>
+            {healthy ? "Streaming" : connected ? "Reconnecting" : "Offline"}
           </span>
         </div>
         <div className="mt-3 flex flex-col gap-0.5 text-xs text-slate-500 font-medium">
-          <span>All systems operational</span>
-          <span>No alerts</span>
+          {mode ? <span>exec mode: {mode.replace(/_/g, " ")}</span> : <span>exec mode: unknown</span>}
+          <span>{healthy ? "receiving live events" : "stale — HTTP refresh only"}</span>
         </div>
       </div>
     </div>

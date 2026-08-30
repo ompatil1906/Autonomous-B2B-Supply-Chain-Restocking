@@ -1,4 +1,4 @@
-import type { AuditRecord } from "../../lib/types";
+import type { AuditRecord, SystemStatus } from "../../lib/types";
 import type { LiveModel } from "../../hooks/useLive";
 import { KpiBar } from "./KpiBar";
 import { LiveInventoryChart } from "./LiveInventoryChart";
@@ -10,11 +10,13 @@ import { SystemHealth } from "./SystemHealth";
 export function LiveOpsScreen({
   live,
   audit,
+  status,
   onOpenLedger,
   onOpenOverview,
 }: {
   live: LiveModel;
   audit: AuditRecord[];
+  status?: SystemStatus | null;
   onOpenLedger: () => void;
   onOpenOverview: () => void;
 }) {
@@ -29,6 +31,9 @@ export function LiveOpsScreen({
           criticalCount={criticalCount}
           activeRestocks={activeRestocks}
           budget={live.budget}
+          connected={live.connected}
+          healthy={live.healthy}
+          mode={status?.razorpay_execution_mode}
         />
       </div>
 
@@ -52,7 +57,14 @@ export function LiveOpsScreen({
             <RecentActivity audit={audit} triggers={live.triggers} products={live.products} onOpenLedger={onOpenLedger} />
           </div>
           <div className="lg:col-span-1">
-            <SystemHealth connected={live.connected} healthy={live.healthy} onOpenOverview={onOpenOverview} />
+            <SystemHealth
+              connected={live.connected}
+              healthy={live.healthy}
+              mode={status?.razorpay_execution_mode}
+              provider={status?.agent_llm_provider}
+              model={status?.agent_llm_model}
+              onOpenOverview={onOpenOverview}
+            />
           </div>
         </div>
       </div>

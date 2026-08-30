@@ -2,7 +2,8 @@
 
 `APP_ENV` gates behaviour:
   * production  — a real Warden API token is REQUIRED on every write route.
-  * demo        — token required.
+  * demo        — the well-known dev token is accepted so the hosted demo works
+                  out of the box with zero configuration.
   * development — the well-known dev token is accepted so the local demo works.
 """
 from __future__ import annotations

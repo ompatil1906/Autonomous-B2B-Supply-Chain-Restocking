@@ -1,26 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Rocket, Square } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "./lib/api";
 import type {
-  ApprovalRecord, AuditRecord, Inventory, RunResult, SystemStatus,
+  ApprovalRecord,
+  AuditRecord,
+  Inventory,
+  RunResult,
+  SystemStatus,
 } from "./lib/types";
-import { C, inr } from "./lib/theme";
+import type { TabId } from "./lib/nav";
+import { C } from "./lib/theme";
 
-// Components
 import { Header } from "./components/layout/Header";
 import { Sidebar } from "./components/layout/Sidebar";
-import type { TabId } from "./components/layout/TabBar";
-import { Breaker } from "./components/Breaker";
-import { MandateSeal } from "./components/MandateSeal";
-import { Console } from "./components/Console";
+import { TabBar } from "./components/layout/TabBar";
 import { Overview } from "./components/Overview";
 import { Approvals } from "./components/Approvals";
 import { LedgerTable } from "./components/LedgerTable";
 import { ConfigureTab } from "./components/ConfigureTab";
-import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
+import { MissionControl } from "./components/MissionControl";
+import { DemoDrawer } from "./components/DemoDrawer";
+import { InventoryScreen } from "./components/InventoryScreen";
+import { RestockPipelineScreen } from "./components/RestockPipelineScreen";
+import { SuppliersScreen } from "./components/SuppliersScreen";
+import { PaymentsScreen } from "./components/PaymentsScreen";
 import { LandingPage } from "./components/LandingPage";
 import { useLive } from "./hooks/useLive";
-import { ShieldAlert, PlayCircle, Link2, MessageCircle, CheckCircle2, Sparkles } from "lucide-react";
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -33,11 +37,9 @@ export default function App() {
   const [approvalsList, setApprovalsList] = useState<ApprovalRecord[]>([]);
 
   const [result, setResult] = useState<RunResult | null>(null);
-  const [revealed, setRevealed] = useState(-1);
   const [busy, setBusy] = useState(false);
   const [liveNode, setLiveNode] = useState<string | null>(null);
   const [wsState, setWsState] = useState<"connecting" | "open" | "closed">("connecting");
-  const timers = useRef<number[]>([]);
 
   const ceiling = status?.ap2_limit_inr ?? 10_000;
   const pendingCount = approvalsList.filter((a) => a.status === "pending").length;
@@ -76,7 +78,7 @@ export default function App() {
     refresh().catch(console.error);
     api
       .latest()
-      .then((r) => r.latest && setResult(r.latest))
+      .then((r) => r && r.latest && setResult(r.latest))
       .catch(() => {});
     const check = setInterval(() => {
       api.health()
@@ -88,21 +90,6 @@ export default function App() {
       .catch(() => setWsState("closed"));
     return () => clearInterval(check);
   }, [refresh]);
-
-  // Reveal console steps with slightly irregular, human-feeling delays.
-  useEffect(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
-    if (!result) return;
-    setRevealed(-1);
-    let acc = 0;
-    result.steps.forEach((_, i) => {
-      acc += 350 + Math.floor(Math.random() * 450);
-      const t = window.setTimeout(() => setRevealed(i), acc);
-      timers.current.push(t);
-    });
-    return () => timers.current.forEach(clearTimeout);
-  }, [result]);
 
   if (showIntro) {
     return <LandingPage onComplete={() => setShowIntro(false)} />;
@@ -125,73 +112,67 @@ export default function App() {
       });
   };
 
-  const steps = result?.steps ?? [];
-  const animating = !!result && revealed < steps.length - 1;
-  const running = busy || animating;
-
-  const gateIdx = steps.findIndex((s) => s.kind === "gate");
-  const negIdx = steps.findIndex((s) => s.kind === "negotiate");
-  const payIdx = steps.findIndex((s) => s.kind === "execute" || s.kind === "escalate");
-
-  const breakerState: "idle" | "closed" | "tripped" =
-    !result || gateIdx === -1 || revealed < gateIdx
-      ? "idle"
-      : result.gate.passed
-        ? "closed"
-        : "tripped";
-
-  const cartTotal =
-    result && negIdx !== -1 && revealed >= negIdx
-      ? result.cart.credentialSubject.total_inr
-      : 0;
-  const cartUnit =
-    result && cartTotal ? result.cart.credentialSubject.items[0].unit_price_inr : null;
-  const cartQty = result && cartTotal ? result.cart.credentialSubject.items[0].quantity : null;
-
-  const paySealed = result && payIdx !== -1 && revealed >= payIdx;
-  const executed = result?.status === "executed";
-  const failed = result?.status === "blocked";
-  const complete = !!result && revealed >= steps.length - 1;
-
   const lowStocks = inventory?.catalog.filter((s) => s.stock < s.reorder_threshold) ?? [];
+  const lowStockSummary = lowStocks.length
+    ? `Low-stock triggers: ${lowStocks
+        .map((s) => `${s.sku} (${s.stock} left, threshold ${s.reorder_threshold})`)
+        .join(" · ")}`
+    : "";
 
   const getHeaderInfo = (tabId: TabId) => {
     switch (tabId) {
-      case "overview": return { title: "Business Intel", subtitle: "System status and performance metrics" };
-      case "live": return { title: "Live Intel", subtitle: "Real-time overview of your restocking operations" };
-      case "mission": return { title: "Mission Control", subtitle: "Agent reasoning and execution trace" };
-      case "approvals": return { title: "Approvals", subtitle: "Pending escalations and manual overrides" };
-      case "ledger": return { title: "Audit Trail", subtitle: "Immutable record of all agent actions" };
-      case "configure": return { title: "Configuration", subtitle: "System constraints and behavior settings" };
-      default: return { title: "Mission Control", subtitle: "Real-time overview of your restocking operations" };
+      case "overview":
+        return { title: "Overview", subtitle: "System status and performance metrics" };
+      case "live":
+        return { title: "Live Intel", subtitle: "Real-time overview of your restocking operations" };
+      case "mission":
+        return { title: "Mission Control", subtitle: "Agent reasoning and execution trace" };
+      case "inventory":
+        return { title: "Inventory", subtitle: "Stock, velocity and projected risk per SKU" };
+      case "pipeline":
+        return { title: "Restock Pipeline", subtitle: "Every decision — in flight, executed or blocked" };
+      case "suppliers":
+        return { title: "Suppliers", subtitle: "Verified counterparties and actual purchasing" };
+      case "approvals":
+        return { title: "Approvals", subtitle: "Pending escalations and manual overrides" };
+      case "payments":
+        return { title: "Payments", subtitle: "Razorpay activity — every leg, honestly labelled" };
+      case "ledger":
+        return { title: "Audit Trail", subtitle: "Immutable record of all agent actions" };
+      case "configure":
+        return { title: "Configuration", subtitle: "Constraints, behavior settings and credentials" };
+      default:
+        return { title: "Mission Control", subtitle: "Real-time overview of your restocking operations" };
     }
   };
 
   const headerInfo = getHeaderInfo(tab);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8F9FB]">
-      <Sidebar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
-      
+    <div className="flex h-screen overflow-hidden" style={{ background: C.bg }}>
+      <Sidebar
+        activeTab={tab}
+        onTabSelect={setTab}
+        pendingCount={pendingCount}
+        skuCount={live.products.length}
+        connected={live.connected}
+      />
+
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <Header 
+        <Header
           title={headerInfo.title}
           subtitle={headerInfo.subtitle}
-          wsState={wsState} 
-          onHome={() => setShowIntro(true)} 
+          wsState={wsState}
+          mode={status?.razorpay_execution_mode}
+          onHome={() => setShowIntro(true)}
         />
-        
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8 relative">
-        <FloatingPresenterTools live={live} />
 
-        <div className="max-w-[1400px] mx-auto animate-slide-in pb-24">
+        <TabBar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
+
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6 relative">
+          <div className="max-w-[1400px] mx-auto pb-24">
             {tab === "live" && (
-              <LiveOpsScreen
-                live={live}
-                audit={audit}
-                onOpenLedger={() => setTab("ledger")}
-                onOpenOverview={() => setTab("overview")}
-              />
+              <LiveOpsHost live={live} audit={audit} status={status} onLedger={() => setTab("ledger")} onOverview={() => setTab("overview")} />
             )}
 
             {tab === "overview" && (
@@ -200,180 +181,40 @@ export default function App() {
                 inventory={inventory}
                 audit={audit}
                 pendingCount={pendingCount}
-                spentToday={live.budget.spentRupees}
+                live={live}
                 onOpenMission={() => setTab("mission")}
                 onOpenApprovals={() => setTab("approvals")}
               />
             )}
 
+            {tab === "inventory" && <InventoryScreen live={live} inventory={inventory} status={status} />}
+
+            {tab === "pipeline" && <RestockPipelineScreen live={live} />}
+
+            {tab === "suppliers" && <SuppliersScreen />}
+
+            {tab === "payments" && <PaymentsScreen />}
+
             {tab === "mission" && (
-              <>
-                <div
-                  className="rounded-xl p-4 mb-6 flex items-center justify-between flex-wrap gap-3"
-                  style={{ background: C.surface, border: `1px solid ${C.hair}` }}
-                >
-                  <div className="flex items-center gap-2 text-sm" style={{ color: C.textHi }}>
-                    <ShieldAlert size={16} color={C.brass} />
-                    {lowStocks.length
-                      ? `Low-stock triggers: ${lowStocks
-                          .map((s) => `${s.sku} (${s.stock} left, threshold ${s.reorder_threshold})`)
-                          .join(" · ")}`
-                      : `Warehouse nominal across all ${inventory?.catalog.length ?? 0} SKUs — no restock triggers`}
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    <ScenarioBtn label="Run: normal restock" tone={C.green} dim={C.greenDim} onClick={() => run("happy")} disabled={running} />
-                    <ScenarioBtn label="Run: price spike (breach)" tone={C.red} dim={C.redDim} onClick={() => run("failure")} disabled={running} />
-                    <ScenarioBtn label="Run: hallucinated qty" tone={C.brass} dim={C.brassDim} onClick={() => run("happy", 10000)} disabled={running} />
-                  </div>
-                </div>
-
-                {liveNode && busy && (
-                  <div className="mb-4 text-xs mono" style={{ color: C.textLo }}>
-                    executing node <span style={{ color: C.brass }}>{liveNode}</span>…
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-[220px_1fr_280px] gap-4">
-                    <Breaker state={breakerState} cart={cartTotal} ceiling={ceiling} dailyCeiling={status?.ap2_daily_ceiling_inr} />
-
-                  <div
-                    className="rounded-2xl p-5"
-                    style={{ background: C.surface, border: `1px solid ${C.hair}`, minHeight: 380 }}
-                  >
-                    <div className="text-xs mb-4 tracking-wide" style={{ color: C.textLo }}>
-                      LIVE AGENT CONSOLE
-                    </div>
-                    {!result && (
-                      <div className="text-sm py-16 text-center" style={{ color: C.textLo }}>
-                        Run a scenario to watch Warden reason through it, step by step.
-                      </div>
-                    )}
-                    <Console steps={steps} revealed={revealed} />
-
-                    {failed && complete && (
-                      <div className="mt-5 rounded-xl p-3" style={{ background: C.raised, border: `1px solid ${C.hair}` }}>
-                        <div className="flex items-center gap-2 text-xs mb-2" style={{ color: C.textLo }}>
-                          <MessageCircle size={13} /> WhatsApp — sent to merchant
-                        </div>
-                        <div
-                          className="rounded-lg rounded-tl-none p-3 text-sm max-w-md"
-                          style={{ background: C.greenDim, color: C.textHi }}
-                        >
-                          {result?.whatsapp_message?.message ?? "Supplier increased prices — please approve manually."}
-                        </div>
-                        <div className="mt-2 flex gap-2 flex-wrap items-center">
-                          {result?.payment_link?.short_url && !result.payment_link.simulated && (
-                            <a
-                              href={result.payment_link.short_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex text-xs px-3 py-1.5 rounded-lg items-center gap-1.5 transition-opacity hover:opacity-80"
-                              style={{ background: C.brassDim, color: C.brass, border: "1px solid rgba(168,127,61,0.4)" }}
-                            >
-                              <Link2 size={12} /> Open secure approval link
-                            </a>
-                          )}
-                          {result?.payment_link?.simulated && (
-                            <span
-                              className="text-xs px-3 py-1.5 rounded-lg mono"
-                              title="Created by the offline simulator (remote MCP unreachable) — no live URL exists"
-                              style={{ background: C.raised, color: C.textLo, border: `1px dashed ${C.hairStrong}` }}
-                            >
-                              simulated link — no live URL
-                            </span>
-                          )}
-                          <button
-                            onClick={() => setTab("approvals")}
-                            className="inline-flex text-xs px-3 py-1.5 rounded-lg items-center gap-1.5 transition-opacity hover:opacity-80"
-                            style={{ background: C.redDim, color: C.red, border: "1px solid rgba(222,76,74,0.35)" }}
-                          >
-                            Review in Approvals →
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-3">
-                    <MandateSeal
-                      n={1}
-                      title="IntentMandate"
-                      status="signed"
-                      mandate={complete ? result.intent : null}
-                      fields={[
-                        ["SKU", status?.ap2_sku ?? "—"],
-                        ["Max qty", `${status?.ap2_max_qty ?? "—"} units`],
-                        ["Max unit price", inr(status?.ap2_max_unit_price)],
-                        ["Order cap", inr(ceiling)],
-                      ]}
-                    />
-                    <MandateSeal
-                      n={2}
-                      title="CartMandate"
-                      status={cartTotal ? "signed" : "pending"}
-                      mandate={complete ? result.cart : null}
-                      fields={
-                        cartTotal
-                          ? [
-                              ["Qty", `${cartQty} units`],
-                              ["Unit price", inr(cartUnit)],
-                              ["Total", inr(cartTotal)],
-                            ]
-                          : [["Awaiting", "supplier response"]]
-                      }
-                    />
-                    <MandateSeal
-                      n={3}
-                      title="PaymentMandate"
-                      status={paySealed ? (executed ? "signed" : "void") : "pending"}
-                      mandate={complete ? result.payment_mandate : null}
-                      fields={
-                        paySealed
-                          ? executed
-                            ? [
-                                ["Debited", inr(cartTotal)],
-                                ["Rail", "UPI Reserve Pay"],
-                                ["Ref", result.capture_result?.id?.slice(0, 18) ?? "—"],
-                              ]
-                            : [
-                                ["Reason", "Order cap exceeded"],
-                                ["Funds moved", "None"],
-                              ]
-                          : [["Awaiting", "boundary check"]]
-                      }
-                    />
-                  </div>
-                </div>
-
-                {executed && complete && (
-                  <div
-                    className="mt-6 rounded-xl p-4 flex items-center gap-6 flex-wrap text-xs"
-                    style={{ background: C.greenDim, border: "1px solid rgba(14,159,110,0.35)" }}
-                  >
-                    <span className="flex items-center gap-2 font-medium" style={{ color: C.green }}>
-                      <CheckCircle2 size={14} /> Settled autonomously
-                    </span>
-                    <span className="mono" style={{ color: C.textHi }}>{inr(cartTotal)} captured</span>
-                    <span style={{ color: C.textLo }}>
-                      Daily pool remaining{" "}
-                      <span className="mono" style={{ color: C.textHi }}>{inr(reserveRemaining)}</span>
-                    </span>
-                    <span style={{ color: C.textLo }}>
-                      Stock now{" "}
-                      <span className="mono" style={{ color: C.textHi }}>
-                        {result?.stock_after[result!.sku]} units
-                      </span>
-                    </span>
-                  </div>
-                )}
-              </>
+              <MissionControl
+                result={result}
+                liveNode={liveNode}
+                busy={busy}
+                onRun={run}
+                onOpenApprovals={() => setTab("approvals")}
+                lowStockSummary={lowStockSummary}
+                skuCount={inventory?.catalog.length ?? 0}
+                reserveRemaining={reserveRemaining}
+                ceiling={ceiling}
+                dailyCeiling={status?.ap2_daily_ceiling_inr}
+              />
             )}
 
             {tab === "approvals" && (
               <Approvals
                 reloadKey={audit.length + approvalsList.length}
                 names={Object.fromEntries(
-                  (live.products.length ? live.products : inventory?.catalog ?? []).map((p) => [p.sku, p.name])
+                  (live.products.length ? live.products : inventory?.catalog ?? []).map((p) => [p.sku, p.name]),
                 )}
               />
             )}
@@ -393,139 +234,26 @@ export default function App() {
           </div>
         </main>
       </div>
+
+      <DemoDrawer live={live} onRun={run} />
     </div>
   );
 }
 
-function ScenarioBtn({
-  label,
-  tone,
-  dim,
-  onClick,
-  disabled,
+// Live Intel page host — keeps App.tsx from re-declaring wiring.
+import { LiveOpsScreen } from "./components/live/LiveOpsScreen";
+function LiveOpsHost({
+  live,
+  audit,
+  status,
+  onLedger,
+  onOverview,
 }: {
-  label: string;
-  tone: string;
-  dim: string;
-  onClick: () => void;
-  disabled: boolean;
+  live: ReturnType<typeof useLive>;
+  audit: AuditRecord[];
+  status: SystemStatus | null;
+  onLedger: () => void;
+  onOverview: () => void;
 }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 disabled:opacity-40 transition-opacity hover:opacity-90"
-      style={{
-        background: dim,
-        color: tone,
-        border: `1px solid ${tone}59`,
-      }}
-    >
-      <PlayCircle size={14} /> {label}
-    </button>
-  );
-}
-
-function FloatingPresenterTools({ live }: { live: ReturnType<typeof useLive> }) {
-  const [isOpen, setIsOpen] = useState(true);
-
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-3 bg-[#1B223C] text-white rounded-full shadow-xl hover:bg-slate-800 transition-transform hover:-translate-y-1 font-bold text-xs"
-      >
-        <Sparkles size={14} /> Presenter Tools
-      </button>
-    );
-  }
-
-  return (
-    <div className="fixed bottom-6 right-6 z-50 w-72 bg-white rounded-2xl p-4 shadow-2xl shadow-black/10 border border-slate-200 animate-in slide-in-from-bottom-5">
-      <div className="flex justify-between items-center mb-3">
-        <div className="text-[10px] font-bold tracking-widest text-slate-400">
-          PRESENTER TOOLS
-        </div>
-        <button 
-          onClick={() => setIsOpen(false)}
-          className="p-1 hover:bg-slate-100 rounded text-slate-500"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-      <DemoControls live={live} />
-    </div>
-  );
-}
-
-function DemoControls({ live }: { live: ReturnType<typeof useLive> }) {
-  const [festivalBusy, setFestivalBusy] = useState(false);
-  const [probeBusy, setProbeBusy] = useState(false);
-
-  const toggleFestival = async () => {
-    setFestivalBusy(true);
-    try {
-      if (live.festivalActive) await api.festivalStop();
-      else await api.festivalStart(10);
-      await live.refresh();
-    } finally {
-      setFestivalBusy(false);
-    }
-  };
-
-  const probe = async (sku: string) => {
-    setProbeBusy(true);
-    try {
-      await api.probe(sku);
-    } catch {
-      /* already restocking */
-    } finally {
-      setProbeBusy(false);
-    }
-  };
-
-  const skus = live.products.length
-    ? live.products.map((p) => p.sku)
-    : ["SKU-404", "SKU-101", "SKU-203"];
-
-  return (
-    <div className="flex flex-col gap-4">
-      <button
-        onClick={toggleFestival}
-        disabled={festivalBusy}
-        className={`w-full flex justify-center items-center gap-2 text-[13px] px-4 py-3 rounded-xl disabled:opacity-50 hover:-translate-y-0.5 transition-all font-bold shadow-sm ${
-          live.festivalActive 
-            ? "bg-red-500 text-white hover:bg-red-600 hover:shadow-red-500/20" 
-            : "bg-[#1B223C] text-white hover:bg-slate-800 hover:shadow-slate-800/20"
-        }`}
-      >
-        {live.festivalActive ? <Square size={14} fill="currentColor" /> : <Rocket size={14} />}
-        {festivalBusy ? "Processing..." : live.festivalActive ? "Stop Simulation" : "Simulate Festival Drop (10s)"}
-      </button>
-
-      <div className="pt-2 border-t border-slate-100">
-        <div className="text-[11px] font-semibold text-slate-500 mb-2">
-          FORCE RESTOCK TRIGGER:
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {skus.map((sku) => (
-            <button
-              key={sku}
-              disabled={probeBusy}
-              onClick={() => probe(sku)}
-              className="font-mono text-[10px] px-2.5 py-1.5 rounded-md disabled:opacity-40 hover:bg-slate-50 transition-colors bg-white border border-slate-200 text-slate-700 shadow-sm font-semibold hover:border-slate-300"
-              title={`Trigger manual restock for ${sku}`}
-            >
-              {sku.replace("SKU-", "")}
-            </button>
-          ))}
-        </div>
-      </div>
-      
-      <div className="text-[10.5px] leading-relaxed p-3 rounded-xl bg-blue-50 border border-blue-100 text-blue-700 mt-1 font-medium">
-        <span className="font-bold block mb-1">PRO TIP</span>
-        Run the festival drop twice to exhaust the ₹1 lakh daily pool and watch the portfolio-cap escalation fire live.
-      </div>
-    </div>
-  );
+  return <LiveOpsScreen live={live} audit={audit} status={status} onOpenLedger={onLedger} onOpenOverview={onOverview} />;
 }

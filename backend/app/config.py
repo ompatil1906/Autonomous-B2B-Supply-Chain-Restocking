@@ -50,7 +50,8 @@ class Settings(BaseSettings):
     # development | demo | production
     app_env: str = "development"
     # Bearer token required on financially-consequential write endpoints. When unset
-    # in development, a well-known dev token is accepted so the local demo works.
+    # in development/demo, a well-known dev token is accepted so the demo works with
+    # zero configuration; production requires a real token via WARDEN_API_TOKEN.
     warden_api_token: str = ""
 
     # Demo staging — theatrical node delays off unless explicitly enabled in demos.
@@ -88,7 +89,9 @@ class Settings(BaseSettings):
     def api_token(self) -> str:
         if self.warden_api_token:
             return self.warden_api_token
-        if self.app_env == "development":
+        if self.app_env in ("development", "demo"):
+            # Well-known development/demo token so the demo works out of the box
+            # with zero configuration. Production ALWAYS requires a real token.
             return "warden-dev-token"
         return ""
 

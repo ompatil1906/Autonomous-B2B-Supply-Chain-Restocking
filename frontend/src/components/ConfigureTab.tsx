@@ -1,7 +1,8 @@
-import { Ban, CheckCircle2, IndianRupee, Settings2, ShieldCheck, Wallet, Zap, FileText } from "lucide-react";
+import { Ban, CheckCircle2, IndianRupee, KeyRound, Settings2, ShieldCheck, Wallet, Zap, FileText } from "lucide-react";
 import type { SystemStatus } from "../lib/types";
 import { C, inr } from "../lib/theme";
 import { fmtCompact } from "../lib/format";
+import { tokenSource } from "../lib/auth";
 
 export function ConfigureTab({
   status,
@@ -22,6 +23,12 @@ export function ConfigureTab({
   const portfolio = status?.portfolio ?? [];
   const walkthroughName =
     portfolio.find((p) => p.sku === status?.ap2_sku)?.name ?? "Minimal Cotton Tee (Black)";
+  const tokenSourceLabel = tokenSource();
+  const src = (() => {
+    if (tokenSourceLabel === "env") return "Build-time VITE_WARDEN_TOKEN";
+    if (tokenSourceLabel === "stored") return "Saved in this browser";
+    return "Inbuilt development/demo token";
+  })() as string;
 
   const rows: [string, string][] = [
     ["SKU", `${status?.ap2_sku ?? "—"} — ${walkthroughName}`],
@@ -62,7 +69,8 @@ export function ConfigureTab({
           </div>
           <div className="text-xs mb-6 leading-relaxed" style={{ color: C.textLo }}>
             The walkthrough mandate Mission control executes step by step. In Live Ops the agent
-            signs one like it per SKU, automatically, before every purchase.
+            signs one like it per SKU, automatically, before every purchase. Bounds are enforced by
+            an <span style={{ color: C.brass }}>AP2-inspired</span> boundary gate (17 deterministic checks), not by the LLM.
           </div>
           
           <div className="space-y-3 mb-6">
@@ -205,6 +213,43 @@ export function ConfigureTab({
             </table>
           </div>
         )}
+      </div>
+
+      {/* Warden write token */}
+      <div className="rounded-2xl p-6" style={{ background: C.surface, border: `1px solid ${C.hair}`, boxShadow: "0 2px 8px rgba(0,0,0,0.02)" }}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: C.raised }}>
+              <KeyRound size={16} color={C.accentBlue} />
+            </div>
+            <span className="text-sm font-bold tracking-wide uppercase" style={{ color: C.textHi }}>
+              Warden write token
+            </span>
+          </div>
+          <span
+            className="text-[10px] px-2.5 py-1 rounded-md font-bold tracking-wider uppercase inline-flex items-center gap-1.5"
+            style={{ background: C.greenDim, color: C.green, border: "1px solid rgba(14,159,110,0.3)" }}
+          >
+            <CheckCircle2 size={12} /> Auto
+          </span>
+        </div>
+        <p className="text-xs mb-4 leading-relaxed" style={{ color: C.textLo }}>
+          Financially-consequential writes (runs, probes, approvals, scenarios) are authenticated
+          server-side with the <span className="mono">X-Warden-Token</span> header. The token is resolved
+          automatically — it is never entered by hand, never hardcoded in the UI, never shown back, and
+          never sent on read-only GETs or to URLs/logs/telemetry.
+        </p>
+        <div className="flex items-center gap-3 text-xs p-3 rounded-lg" style={{ background: C.raised, color: C.textHi }}>
+          <ShieldCheck size={16} style={{ color: C.green }} />
+          <div>
+            <span className="font-semibold block">Active &amp; configured automatically — nothing to enter</span>
+            <span style={{ color: C.textLo }}>
+              Source: {src}. For production, set{" "}
+              <span className="mono" style={{ color: C.textHi }}>WARDEN_API_TOKEN</span> on the server and{" "}
+              <span className="mono" style={{ color: C.textHi }}>VITE_WARDEN_TOKEN</span> at build time.
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

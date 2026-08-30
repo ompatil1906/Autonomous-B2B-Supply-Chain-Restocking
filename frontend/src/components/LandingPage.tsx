@@ -235,9 +235,9 @@ export function LandingPage({ onComplete }: { onComplete: () => void }) {
                   <img src="/logo/razorpay.svg" alt="Razorpay" className="w-20 h-20 object-contain" />
                 </div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">AP2 Cryptographic Security</h3>
+              <h3 className="text-2xl font-bold text-slate-900 mb-4">AP2-inspired Cryptographically Bound</h3>
               <p className="text-slate-600 leading-relaxed space-y-3">
-                <span className="block">Before any money moves, Warden verifies the transaction against the merchant’s cryptographic intent mandate. Every transaction must pass deterministic security checks and Ed25519 signature verification.</span>
+                <span className="block">Before any money moves, Warden verifies the transaction against the merchant’s cryptographic intent mandate. Every transaction must pass deterministic boundary checks and Ed25519 signature verification.</span>
                 <span className="block">The AI cannot override the merchant’s predefined spending limits. Once everything is verified, Warden selects the optimal supplier, calculates the restock quantity, and executes the payment through the Razorpay API.</span>
               </p>
             </div>
@@ -256,14 +256,14 @@ export function LandingPage({ onComplete }: { onComplete: () => void }) {
             </div>
             <div className="space-y-3">
               <div><span className="text-blue-400">warden</span> <span className="text-slate-300">analyze</span> --sku SKU-F3</div>
-              <div className="text-slate-500">&gt; Ingesting live sales velocity: 150 units/min</div>
+              <div className="text-slate-500">&gt; Ingesting live sales velocity: 12 units/min</div>
               <div className="text-slate-500">&gt; Current stock: 85 units</div>
-              <div className="text-amber-400">&gt; ALERT: Stockout predicted in 35 seconds.</div>
-              <div className="text-slate-500">&gt; Checking Mandate ceiling: ₹12,000 limit</div>
-              <div className="text-slate-500">&gt; Negotiating with Supplier... quote ₹160/unit</div>
-              <div className="text-emerald-400">&gt; Action: Executing restock for 80 units (₹12,800)</div>
+              <div className="text-amber-400">&gt; ALERT: Stockout predicted in 90 seconds.</div>
+              <div className="text-slate-500">&gt; Checking AP2-inspired mandate ceiling: ₹11,200 limit</div>
+              <div className="text-slate-500">&gt; Negotiating with supplier... quote ₹160/unit</div>
+              <div className="text-emerald-400">&gt; Action: Executing restock for 70 units (₹11,200)</div>
               <div className="text-slate-500">&gt; Verifying Ed25519 signatures... <span className="text-green-400">Valid</span></div>
-              <div className="text-emerald-400">&gt; Payment captured via Razorpay AP2. Uptime secured.</div>
+              <div className="text-slate-500">&gt; Razorpay order created (mode=remote_test) — live capture webhook pending</div>
             </div>
           </div>
 
@@ -280,7 +280,7 @@ export function LandingPage({ onComplete }: { onComplete: () => void }) {
               <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">1</div>
                 <div className="flex-1 font-semibold text-slate-900">Observe</div>
-                <div className="text-sm font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">150 units/min</div>
+                <div className="text-sm font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">12 units/min</div>
               </div>
               <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm">2</div>
@@ -290,7 +290,7 @@ export function LandingPage({ onComplete }: { onComplete: () => void }) {
               <div className="flex items-center gap-4 bg-emerald-50 p-4 rounded-xl border border-emerald-100 shadow-sm">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-sm">3</div>
                 <div className="flex-1 font-semibold text-emerald-700">Execute</div>
-                <div className="text-sm font-mono text-emerald-600 bg-white px-2 py-1 rounded border border-emerald-100 shadow-sm">Razorpay AP2</div>
+                <div className="text-sm font-mono text-emerald-600 bg-white px-2 py-1 rounded border border-emerald-100 shadow-sm">Razorpay (AP2-inspired)</div>
               </div>
             </div>
           </div>
