@@ -31,6 +31,7 @@ class Constraint(BaseModel):
     user_cart_confirmation_required: bool = False
     supplier_dids: list[str] = Field(default_factory=list)
     valid_until: str
+    policy_version: str = "warden-policy-v1"
 
 
 class IntentSubject(BaseModel):

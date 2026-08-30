@@ -39,35 +39,39 @@ async def test_happy_path_autonomous_capture():
 
 
 @pytest.mark.asyncio
-async def test_failure_path_graceful_escalation():
-    result = await run_agent(scenario="failure")
-    assert result["status"] == "blocked"
-    assert result["gate"]["passed"] is False
-    assert result["cart"]["credentialSubject"]["total_inr"] == 11000.0
-    assert result["capture_result"] is None
-    assert result["payment_link"]["amount"] == 1_100_000  # ₹11,000 in paise
-    assert "exceeds my" in result["whatsapp_message"]["message"]
-    assert "https://rzp.io/" in result["payment_link"]["short_url"]
-    assert result["stock_after"]["SKU-404"] == 12  # untouched
-
-    # The blocked purchase must be sitting in the merchant's approval inbox.
-    esc_id = result["escalation_id"]
-    assert esc_id and esc_id.startswith("appr_")
-    pending = approvals_store.list_all()["pending"]
-    assert any(p["id"] == esc_id for p in pending)
-    row = next(p for p in pending if p["id"] == esc_id)
-    assert row["over_by"] == 1000.0  # ₹11,000 vs ₹10,000 ceiling
-
-    # Approving creates a fresh link (mock here) and resolves the escalation.
-    link = await RazorpayMcpClient(force_mock=True).create_payment_link(
-        11000.0, "Manual override", f"OVR-{row['quote_ref']}"
+async def test_price_attack_switches_supplier_autonomously():
+    """Mode B: the incumbent inflates its unit price above the merchant cap; the
+    agent switches to a cheaper eligible supplier instead of escalating."""
+    result = await run_agent(scenario="failure")  # legacy alias → price_attack
+    assert result["status"] == "executed"
+    assert result["gate"]["passed"] is True
+    assert result["negotiation"]["action"] == "SWITCH_SUPPLIER"
+    # incumbent SUP-A was inflated (₹110 > ₹100 cap); Vertex Wholesale (SUP-B) is taken.
+    assert result["negotiation"]["supplier_id"] == "SUP-B"
+    assert result["negotiation"]["unit_price_inr"] < 100.0
+    assert result["cart"]["credentialSubject"]["total_inr"] == pytest.approx(
+        100 * result["negotiation"]["unit_price_inr"], abs=0.02
     )
-    updated = approvals_store.approve(esc_id, link)
-    assert updated["status"] == "approved"
-    assert updated["resolved_link"]["short_url"] == link["short_url"]
-    kinds = {r["kind"] for r in read_all()}
-    assert "approval.requested" in kinds
-    assert "approval.granted" in kinds
+    assert result["money_moved_inr"] == pytest.approx(result["cart"]["credentialSubject"]["total_inr"])
+    assert result["stock_after"]["SKU-404"] == 112  # restock landed
+    assert result["escalation_id"] is None
+    # the run still flowed through the full gated chain, now with per-supplier identity
+    assert result["cart"]["issuer"].startswith("did:ap2:")
+
+
+@pytest.mark.asyncio
+async def test_price_attack_with_no_viable_supplier_escalates():
+    """Daily portfolio ceiling breach → the gate blocks and the agent escalates
+    with a payment link instead of paying out of mandate."""
+    result = await run_agent(
+        scenario="happy",
+        portfolio={"spent": 96_000.0, "ceiling": 100_000.0},
+    )
+    assert result["status"] == "blocked"
+    assert result["money_moved_inr"] == 0.0
+    assert result["escalation_id"] and result["escalation_id"].startswith("appr_")
+    assert result["payment_link"] is not None
+    assert result["payment_link"]["amount"] == pytest.approx(9800.0 * 100)  # paise
 
 
 @pytest.mark.asyncio
@@ -78,7 +82,11 @@ async def test_hallucinated_quantity_is_blocked_by_gate():
     assert result["gate"]["passed"] is False
     qty_check = next(c for c in result["gate"]["checks"] if c["name"] == "quantity_caps")
     assert qty_check["passed"] is False
+    total_check = next(c for c in result["gate"]["checks"] if c["name"] == "total_within_limit")
+    assert total_check["passed"] is False
+    assert result["money_moved_inr"] == 0.0
     assert result["capture_result"] is None
+    assert result["execution"] is None
 
 
 @pytest.mark.asyncio

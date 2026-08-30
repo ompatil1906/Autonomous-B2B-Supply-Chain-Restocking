@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Razorpay_logo.svg" alt="Razorpay Logo" width="200"/>
-  <h1>Warden: Autonomous B2B Supply-Chain Restocking</h1>
+  <h1>WARDEN: Autonomous Revenue Protection for Agentic Commerce</h1>
   <p><strong>Razorpay Buildathon — Track 1: AI Growth & Agentic Commerce</strong></p>
 
   <p>
@@ -22,78 +22,98 @@
 
 ## 🏆 Razorpay Buildathon Submission
 
-**Warden** is a production-ready, autonomous B2B supply-chain purchasing agent that eliminates revenue loss from high-velocity stockouts while enforcing a **strict cryptographic financial boundary**.
+**Warden** is an autonomous B2B purchasing agent that protects revenue from high-velocity stockouts — while proving every rupee it moves on Razorpay's rails.
 
-It is explicitly built for the **Razorpay Buildathon Track 1: AI Growth & Agentic Commerce**, combining a state-of-the-art merchant intelligence dashboard with an ironclad, mandate-driven payment execution engine via Razorpay's MCP (Model Context Protocol).
+It is explicitly built for the **Razorpay Buildathon Track 1: AI Growth & Agentic Commerce**. Two ideas define it:
 
----
-
-## 🚀 The Problem & Our Solution
-
-### ❌ The Problem
-In high-velocity commerce, stockouts lead to immediate revenue loss. However, giving an AI agent unrestricted access to a company's bank account or payment gateway to auto-restock is a catastrophic financial risk. LLMs hallucinate, suppliers price-gouge, and traditional APIs lack cryptographic constraints for AI agents.
-
-### ✅ The Solution: Warden
-Warden monitors live inventory and sales velocity. When a stockout is imminent, it autonomously negotiates with the B2B supplier and triggers a restock. **Crucially, it is gated by the AP2 (Agent Payments Protocol).** The LLM merely *proposes* a payment. A deterministic cryptographic gate verifies the proposed transaction against pre-approved merchant constraints (budget, max price, quantity) before authorizing a Razorpay `capture_payment` via MCP. If constraints are breached, it elegantly degrades to human-in-the-loop via a Razorpay `create_payment_link`.
+1. **The agent sells as well as buys.** Live sales velocity is the demand input to a *revenue-at-risk machine* (expected lost units × selling price inside the restock window). Restocking is framed as revenue protection, not just inventory hygiene.
+2. **The LLM proposes, the gate disposes.** A deterministic verifier (AP2-inspired) checks every money decision against merchant-signed financial boundaries. If the LLM is attacked or hallucinates, the gate refuses with structured evidence and ₹0 moves.
 
 ---
 
-## 💡 Key Features & The UX Vision
+## 🔁 The Closed Loop
 
-We completely redesigned the user experience to ensure a judge or merchant instantly understands the business impact, intelligence of the agent, and high-fidelity aesthetics. The interface feels like a serious AI-powered fintech platform.
+```text
+live sales velocity ──► revenue-at-risk machine ──► economic decision (BUY/WAIT/ESCALATE)
+        ▲                                                        │
+        │                                                        ▼
+stock grows ◄── warehouse apply_restock ◄── capture ◄── gate ◄── supplier negotiation (best bound)
+                                                  │
+                                                  ▼
+                      Razorpay webhook (HMAC-verified) ──► reconciliation MATCHED
+                                                  │
+                                                  ▼
+                             outcome measured → supplier reliability learning
+```
 
-* 📊 **Business Intel & Live Ops:** Real-time metrics presented via premium UI. Visualize daily authority pools, units sold, stockout countdowns, and sales velocity heatmaps.
-* 🧠 **Agent Ops & Mission Control:** A live pipeline visualizing the agent's reasoning (`detect` → `negotiate` → `gate` → `execute`). 
-* 🛡️ **The Authority Breaker:** A physical representation of the cryptographic gateway—glowing green on passed checks, or snapping to red when financial guardrails are hit.
-* 📥 **Audit & Approvals Inbox:** A clean SaaS inbox for manual escalations, offering secure 1-click **Razorpay Payment Link** integrations for human approval. The Ledger acts as a tamper-proof block explorer for irrefutable dispute evidence.
+Every executed run opens a **reconciliation record**; the first `payment.captured` webhook whose amount equals the expected payout advances it PENDING → **MATCHED**. Mismatches become MISMATCH / REQUIRES_REVIEW, and the paid amount is fed back as the agent's reliability signal for next time.
 
 ---
 
-## 🔒 The Security Core: Bounded by AP2
+## ❌ The Problem & ✅ The Solution
 
-The **only** thing that decides whether money moves is the deterministic verifier. Even if the LLM hallucinates a restock of "10,000 units," the gate refuses before any payment is initiated.
+In high-velocity commerce, stockouts are immediate revenue loss. But handing an AI agent the keys to a bank account is catastrophic: LLMs hallucinate, suppliers price-gouge, and ordinary APIs carry no cryptographic authority for agents.
 
-Warden relies on three foundational pillars:
-1. **UPI Reserve Pay (Simulation)** — The merchant blocks funds in their account once (single PIN) creating a shared daily liquidity pool for the agent.
-2. **Google AP2 (Agent Payments Protocol)** — A tamper-proof chain of three Ed25519-signed W3C-flavoured Verifiable Credentials (Mandates).
-3. **Razorpay MCP Server** — `capture_payment` for autonomous debit against the reserve, and `create_payment_link` for human-in-the-loop escalation fallbacks.
+Warden's answer:
+
+- **Revenue framing** — a deterministic machine turns live velocity into `revenue_at_risk`, `contribution_at_risk`, and a `protection_spend_ratio`, so spend is justified in the merchant's own terms.
+- **Bounded money** — the agent can only ever move money inside a pre-signed financial boundary (`IntentMandate`): SKUs, quantity caps, unit price ceilings, total budget, expiry, and a daily portfolio ceiling.
+- **Supplier competition** — three real suppliers, each with its own Ed25519 identity. If the incumbent gouges the price above the merchant cap, the agent *switches suppliers autonomously* (or escalates only when no eligible quote exists).
+- **Proof on Razorpay rails** — execution anchors a Razorpay **Order** whose proof-notes carry the full Warden mandate chain hash; captured amounts reconcile back through a **webhook**; both are rendered in the Receipts tab.
+
+---
+
+## 🔒 The Security Core: Bounded by Gate, Signed by Identity
+
+The **only** thing that decides whether money moves is the deterministic gate. Even if the LLM proposes "10,000 units", the gate refuses before any payment object is created.
+
+Three pillars:
+
+1. **Network ed25519 identities** — merchant, agent, and each supplier derive a persistent DID from their signing key (`did:ap2:<pubkey>`). Signature verification enforces issuer↔key binding; a mandate from an unregistered DID simply cannot verify.
+2. **The three-mandate evidence chain** — intent (human authority) → cart (supplier promise) → payment (agent proof), each ed25519-signed and hash-chained to the previous.
+3. **Razorpay MCP (42 tools)** — `create_order` + `update_order` (anchor + proof notes), `create_payment_link` (human fallback), `capture_payment` (autonomous debit; requires an authorized `pay_` id). Payouts are fetch-only — Warden *anchors* settlement on Orders, never pushes funds.
 
 ### The Three-Mandate Evidence Chain
 
 | Mandate | Issuer | What it proves |
 | :--- | :--- | :--- |
-| **IntentMandate** | Merchant Wallet | Exactly what the human authorized: SKU constraints, quantity caps, unit price ceilings, total budget, expiry. |
-| **CartMandate** | B2B Supplier | Exactly what the supplier promised: SKUs, quantities, and final settlement price. Cryptographically bound to the Intent. |
-| **PaymentMandate** | Agent | Why the agent paid or refused: the executed Razorpay `payment_id` or an `aborted` receipt. |
+| **IntentMandate** | Merchant | Exactly what the human authorized: SKU constraints, quantity caps, unit price ceilings, total budget, expiry, policy version. |
+| **CartMandate** | B2B Supplier | Exactly what the supplier promised: SKUs, quantities, and final settlement price, bound to the Intent. |
+| **PaymentMandate** | Agent | Why the agent paid or refused: the execution result, or an `aborted` receipt. |
+
+### Every money leg is tagged with truth
+
+Legs are never labelled by configuration — they are labelled by what *actually happened* (`simulated` = local deterministic simulator stood in; `test` = a genuine Razorpay test-mode object was created via remote MCP). With no credentials, the whole rail degrades cleanly to the simulator with distinct tags, and the audit log remains irrefutable.
 
 ---
 
-## 🌐 The 3 MCP Servers (Model Context Protocol)
+## 🧭 Agent Pipeline (LangGraph)
 
-To ensure the agent makes grounded, safe, and explainable decisions, Warden isolates critical capabilities into three distinct **Model Context Protocol (MCP)** integrations:
+```text
+pre_compute → detect → calculate_risk → evaluate_economics
+   │                                              │
+   │                                      BUY ──► search_supplier → negotiate → gate
+   │                                              │                            │
+   └── WAIT (no spend)                     multi   │                     passed ──► execute
+                                            eval   │                            │
+                                                    │                     blocked ──► do_not_buy ◄── hostile gates
+                                                    └── no viable quote ──► escalate (payment link + WhatsApp)
+                                                    
+execute → reconcile (open record) → measure (contribution protected) → learn (supplier reliability) → finish
+```
 
-1. **Razorpay MCP Server (Financial Execution)**
-   - **Role:** Handles the actual movement of money.
-   - **Tools Exposed:** `capture_payment` (auto-debiting the UPI reserve) and `create_payment_link` (escalation to human).
-   - **Why it matters:** The LLM *never* holds payment API keys directly. It only interacts with the standardized Razorpay MCP, which is strictly gated by our cryptographic verifier.
-
-2. **B2B Supplier MCP Server (Procurement & Negotiation)**
-   - **Role:** Exposes the live wholesale catalog and dynamic pricing.
-   - **Tools Exposed:** `get_catalog`, `negotiate_price`, `issue_cart_mandate`.
-   - **Why it matters:** Allows the agent to query real-time stock and haggle prices. When negotiation concludes, the Supplier MCP cryptographically signs the **CartMandate**, locking in the agreed price.
-
-3. **Warehouse & Inventory MCP Server (Live Context)**
-   - **Role:** The agent's eyes on the physical shop floor.
-   - **Tools Exposed:** `get_stock_levels`, `get_sales_velocity`.
-   - **Why it matters:** Feeds the agent real-time telemetry so it can predict stockouts *before* they happen, triggering the LangGraph orchestration pipeline with zero human prompting.
+The LLM is advisory: it may propose strategy (`llm_strategy_statement`) and is told to *attempt* the requested lot, but every boundary decision is deterministic code. In `mock` mode the whole pipeline runs offline-deterministic (the default for tests); with `AGENT_LLM_PROVIDER=gemini` the same pipeline runs live.
 
 ---
 
-## ⚡ The Predictive Trigger Engine
+## ⚡ Predictive Trigger Engine + Velocity
 
-Instead of a static threshold, the engine keeps a sliding window of sales per SKU to compute `predicted_seconds_to_stockout = stock / units_per_minute * 60`. 
+The engine keeps a sliding 30s window of sales per SKU:
 
-A trigger fires when the prediction enters the agent's **90-second lead time** or stock hits the hard floor of 3 units. Hysteresis guarantees one pipeline per SKU plus a cooldown to prevent duplicate restocking.
+- `predicted_seconds_to_stockout = stock / (units/min) × 60`
+- a trigger fires when the prediction enters the **90s lead time**, or stock hits the hard floor of 3 units;
+- hysteresis + cooldown guarantee exactly one pipeline per SKU at a time;
+- festival curves (Marathi: *Masan & Ganesh*) inject demand surges that the revenue machine must quantify.
 
 ---
 
@@ -101,14 +121,16 @@ A trigger fires when the prediction enters the agent's **90-second lead time** o
 
 ```text
 React Dashboard (Vite + TypeScript + TailwindCSS v4)
-   │  REST + WebSocket (Real-time telemetry)
+   │  REST + WebSocket (real-time telemetry & node-by-node pipeline streaming)
    ▼
 FastAPI Backend (backend/app)
-   ├─ agent/       LangGraph orchestration (detect → negotiate → gate → execute|escalate)
-   ├─ ap2/         Mandate models, Ed25519 signer, deterministic gate verifier
-   ├─ services/    Warehouse, B2B supplier, UPI Reserve Pay sim, Razorpay MCP client
-   ├─ audit.py     Append-only JSON-lines cryptographic ledger
-   └─ main.py      REST endpoints + live WebSocket broadcast
+   ├─ agent/    LangGraph orchestration (12-node pipeline + run/limit/portfolio context)
+   ├─ ap2/      Mandate models, per-identity Ed25519 signer, deterministic gate (17 checks)
+   ├─ services/ revenue_risk, negotiation, suppliers, identity, execution, webhooks,
+   │            reconciliation, outcomes, idempotency, razorpay_mcp, live_ops, velocity
+   ├─ audit.py  Append-only hash-chained ledger (tamper-evident)
+   ├─ auth.py   Warden bearer-token guard on every money endpoint
+   └─ main.py   REST endpoints + live WebSocket broadcast
 ```
 
 ---
@@ -118,64 +140,90 @@ FastAPI Backend (backend/app)
 ### 1. Installation
 
 ```bash
-# Clone the repository
 git clone https://github.com/your-username/Autonomous-B2B-Supply-Chain-Restocking.git
 cd Autonomous-B2B-Supply-Chain-Restocking
-
-# Install dependencies for both backend and frontend
-make install
-
-# Alternatively (manual):
-# Backend: uv sync
-# Frontend: cd frontend && npm install
+make install        # uv sync (backend) + npm install (frontend)
 ```
 
-### 2. Configure Razorpay (Sandbox)
+### 2. Configure `.env` (see `.env.example`)
 
-1. Create sandbox keys at `dashboard.razorpay.com` → Settings → API Keys.
-2. Configure your `.env` file in the root directory:
-   ```env
-   RAZORPAY_MODE=remote
-   RAZORPAY_KEY_ID=rzp_test_YourKeyIdHere
-   RAZORPAY_KEY_SECRET=YourSecretKeyHere
-   ```
-*(Note: If the remote Razorpay MCP server is unreachable, Warden automatically falls back to a built-in simulator with the identical tool contract, ensuring the demo never breaks.)*
+```env
+# Agent brain (empty/mock = deterministic offline; gemini = live reasoning)
+AGENT_LLM_PROVIDER=mock            # mock | gemini
+AGENT_LLM_MODEL=gemini-3.5-flash-lite   # used when provider=gemini
+GEMINI_API_KEY=                    # valid Google AI Studio key
 
-### 3. Run the Application
+# Razorpay execution: simulation | remote_test
+RAZORPAY_EXECUTION_MODE=simulation
+RAZORPAY_KEY_ID=rzp_test_YourKeyIdHere
+RAZORPAY_KEY_SECRET=YourSecretKeyHere
+RAZORPAY_WEBHOOK_SECRET=warden-sim-only-secret   # must equal the webhook secret in your Razorpay dashboard
+WARDEN_API_TOKEN=warden-dev-token                # sent as X-Warden-Token on money routes
+```
 
-Start the backend (FastAPI):
+*`remote_test` calls the real Razorpay MCP in test mode (Order/Payment Link/capture tool calls); with no credentials it falls back to the simulator with explicit `simulated` leg tags so the demo never breaks.*
+
+### 3. Run
+
 ```bash
-make run-backend
+make run-backend      # http://localhost:8000/docs
+make run-frontend     # http://localhost:5173
 ```
 
-Start the frontend dashboard (Vite + React + Tailwind):
-```bash
-make run-frontend
-```
-Open **http://localhost:5173** in your browser to view the Warden Dashboard.
+### 4. Write-endpoint auth
+
+POST `/api/run`, `/api/approvals/{id}/approve|reject`, `/api/festival/*`, `/api/live/probe/*`,
+`/api/webhooks/simulate` require `X-Warden-Token: <WARDEN_API_TOKEN>`.
+`POST /api/webhooks/razorpay` is **not** bearer-protected — it is signature-protected
+(`X-Razorpay-Signature: HMAC-SHA256(secret, raw_body)`) exactly like a real Razorpay delivery.
 
 ---
 
 ## 🎮 Evaluation Scenarios (For Judges)
 
-From the **Mission Control** tab in the Web UI, you can trigger live evaluation scenarios:
+From the **Mission Control** tab (or `POST /api/run`), trigger live scenarios:
 
-1. 🟢 **Run: Normal Restock (Autonomous Execution)** 
-   - Cart total is within the Intent cap. 
-   - The Gate passes, funds are captured autonomously via **Razorpay MCP**, and stock is replenished instantly without human intervention.
-2. 🔴 **Run: Price Spike Breach (Human Fallback)** 
-   - Supplier dynamically increases the price, causing the cart to exceed the approved budget constraint. 
-   - The Gate explicitly **blocks** autonomous capture, escalates via WhatsApp, and generates a secure **Razorpay Payment Link** for human approval. Stock remains untouched until approved.
-3. 🔴 **Run: Hallucinated Quantity (Gate Defense)** 
-   - The LLM is forced to maliciously propose an order of 10,000 units. 
-   - The deterministic AP2 gate detects the boundary violation and blocks it immediately.
+| Scenario | What happens | Money moved |
+| :--- | :--- | :--- |
+| 🟢 `happy` | Incumbent SUP-A wins; gate passes; order → capture; webhook → MATCHED | ₹9,800 |
+| 🔶 `price_attack` / `failure` | Incumbent gouges to ₹>100/cap → agent *switches* to SUP-B (₹95.06) | ₹9,506 |
+| 🔴 `rogue_ai` / `hallucinate` | LLM attempts 10,000 units → gate blocked (quantity_caps) → do_not_buy | ₹0 |
+| 🔴 `do_not_buy` | Merchant instructs the agent to hold off → blocked, no spend | ₹0 |
+| 🟠 `multi_supplier` | No incumbent advantage → SUP-B undercuts → already-switched proof | ₹9,506 |
+| ⚪ `do_nothing` | No revenue at risk → WAIT, reserve untouched | ₹0 |
+| 🔴 `escalate` (via portfolio cap) | Daily ceiling would be breached → payment link + approval, no autonomous debit | ₹0 |
 
-### CLI Demo (Headless Testing)
-You can also run the entire agent pipeline from the terminal to see the AP2 gate verdicts and Razorpay tool calls in action:
+The demo also shows the **human fallback**: `/approvals/{id}/approve` mints a Razorpay **Payment Link** for the human to pay manually.
+
+### CLI / Test Suite
+
 ```bash
-make demo-happy      # Simulates a successful autonomous restock
-make demo-failure    # Simulates a supplier price spike triggering human fallback
-uv run python scripts/demo.py --scenario hallucinate --json
+cd backend && ../.venv/bin/python -m pytest tests -q       # 46 tests, deterministic (mock LLM + sim rail)
+make demo-happy
+make demo-failure
+uv run python scripts/demo.py --scenario rogue_ai --json
+```
+
+---
+
+## 🔌 API Surface (highlights)
+
+```
+GET  /api/status            agent charter, portfolio, suppliers, execution mode
+GET  /api/inventory         live stock with predicted time-to-stockout
+GET  /api/revenue-risk      latest revenue-at-risk analysis
+GET  /api/decisions         decision ledger
+GET  /api/audit             tamper-evident mandate chain
+GET  /api/audit/verify      full-hash chain validation
+GET  /api/reconciliations   decision ↔ Razorpay payment matching state
+GET  /api/webhooks/events   every webhook received + its verdict
+GET  /api/razorpay/activity Orders / captures / links / webhooks in one view
+POST /api/run               run a scenario          [auth]
+POST /api/webhooks/razorpay Razorpay delivery entry (signature-verified)
+POST /api/webhooks/simulate synthesise a signed demo webhook   [auth]
+GET  /api/outcomes          what the agent learned (supplier reliability)
+GET  /api/suppliers         all three suppliers + their accounting
+ws   /ws                    node-by-node pipeline telemetry
 ```
 
 ---

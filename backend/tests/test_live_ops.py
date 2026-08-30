@@ -167,6 +167,51 @@ async def test_daily_portfolio_cap_blocks_and_escalates():
     assert verify_chain_valid()
 
 
+# --------------------------------------------- end-to-end live closed loop
+
+@pytest.mark.asyncio
+async def test_live_trigger_runs_real_pipeline_to_matched_reconciliation():
+    """A velocity-triggered restock flows through the REAL pipeline (no stubs):
+    risk → negotiate → gate → execute → webhook → reconciliation MATCHED."""
+    sent: list[dict] = []
+
+    async def fake_broadcast(payload: dict):
+        sent.append(payload)
+
+    t = [1000.0]
+    ops = LiveOps(fake_broadcast, clock=lambda: t[0])
+    ops.launched_at_ms["SKU-F1"] = 1.0  # festival SKU is live
+
+    # Sustained demand (~130 units/min) pushes F1's predicted stockout inside the
+    # 90s agent lead time while stock is still ample — predictive, not a floor hit.
+    for _ in range(30):
+        ops._ingest_sale("SKU-F1", 2)
+        t[0] += 0.9
+    t[0] += 1.0
+
+    await ops._tick_once()
+    trigger = ops.trigger_for_sku("SKU-F1")
+    assert trigger is not None and trigger["reason"] == "predictive_velocity"
+
+    # The real pipeline runs as a background task — await it to completion.
+    await ops._tasks["SKU-F1"]
+    trigger = next(t for t in ops.triggers if t["sku"] == "SKU-F1")
+    assert trigger["outcome"] == "executed"
+    assert trigger["outcome"] == "executed"
+    assert trigger["orderId"].startswith("order_")
+    assert trigger["razorpayBackend"] == "mock"  # simulator stood in
+
+    # The simulated webhook matured the reconciliation record.
+    rec = trigger["reconciliation"]
+    assert rec is not None and rec["state"] == "MATCHED"
+    assert rec["actual_amount_inr"] == pytest.approx(trigger["amountInr"])
+
+    # Stock was replenished by 50 units (F1 restock_qty).
+    from app.services import warehouse as _warehouse
+
+    assert _warehouse.get("SKU-F1").stock >= 200 + 50 - 60
+
+
 def verify_chain_valid() -> bool:
     from app.audit import verify_chain
 

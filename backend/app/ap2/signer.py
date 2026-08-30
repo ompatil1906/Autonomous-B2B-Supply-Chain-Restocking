@@ -24,9 +24,16 @@ _MANDATE_TYPES = {
     "payment": ("AP2PaymentMandate", "mandate.payment.1"),
 }
 
+POLICY_VERSION = "warden-policy-v1"
+
 
 def utcnow_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def new_id(prefix: str) -> str:
+    """Stable prefixed identifiers (dec_..., exec_..., trn_...) for idempotency."""
+    return f"{prefix}_{uuid.uuid4().hex[:16]}"
 
 
 def new_mandate_id() -> str:
@@ -61,6 +68,20 @@ def _sign(issuer_did: str, role: str, subject: dict, vc_type: str, vct: str, exp
         credentialSubject=subject,
         proof=proof,
     )
+
+
+# key-file name that signs a CartMandate for each supplier role.
+def _signing_role_for_supplier(supplier_did: str) -> str | None:
+    from app.ap2.keys import keys, public_did as _pd
+
+    for key_name, key in keys().items():
+        if key_name in ("merchant", "agent", "supplier"):
+            continue
+        if _pd(key) == supplier_did:
+            return key_name
+    if _pd(keys()["supplier"]) == supplier_did:
+        return "supplier"
+    return None
 
 
 def issue_intent_mandate(
@@ -101,6 +122,7 @@ def issue_intent_mandate(
             "user_cart_confirmation_required": user_cart_confirmation_required,
             "supplier_dids": supplier_dids or [],
             "valid_until": expiry,
+            "policy_version": POLICY_VERSION,
         },
     )
     envelope = _sign(merchant_did, "merchant", subject.model_dump(), *_MANDATE_TYPES["intent"], expiry)
@@ -117,6 +139,7 @@ def issue_cart_mandate(
     total_inr: float,
     quote_ref: str,
     prev_mandate_id: str | None = None,
+    signer_role: str | None = None,
 ) -> CartMandate:
     now = utcnow_iso()
     expiry = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(timespec="seconds")
@@ -134,8 +157,18 @@ def issue_cart_mandate(
         currency="INR",
         quote_ref=quote_ref,
     )
-    envelope = _sign(supplier_did, "supplier", subject.model_dump(), *_MANDATE_TYPES["cart"], expiry)
+    role = signer_role or _signing_role_for_supplier(supplier_did) or "supplier"
+    if public_did_of_role(role) != supplier_did:
+        raise ValueError(
+            f"CartMandate issuer {supplier_did} does not match the signing key {role!r} "
+            f"({public_did_of_role(role)})"
+        )
+    envelope = _sign(supplier_did, role, subject.model_dump(), *_MANDATE_TYPES["cart"], expiry)
     return CartMandate.model_validate(envelope.model_dump())
+
+
+def public_did_of_role(role: str) -> str:
+    return get_role_did(role)
 
 
 def issue_payment_mandate(
@@ -168,5 +201,7 @@ def issue_payment_mandate(
     return PaymentMandate.model_validate(envelope.model_dump())
 
 
-def mandate_to_json(m: Mandate) -> dict:
+def mandate_to_json(m: Mandate | dict) -> dict:
+    if isinstance(m, dict):
+        return m
     return json.loads(m.model_dump_json(by_alias=True))

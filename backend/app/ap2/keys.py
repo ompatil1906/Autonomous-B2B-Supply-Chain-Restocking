@@ -57,12 +57,17 @@ def verify_public_did(pub: bytes) -> str:
     return f"did:ap2:{base58.b58encode(pub).decode()}"
 
 
-# Shared key material across the app (roles: merchant wallet, agent, supplier).
+# Shared key material across the app (roles: merchant wallet, agent, suppliers).
+# The legacy "supplier" role is kept for backward compatibility; the autonomous
+# procurement flow uses per-supplier identities (supplier_a/b/c).
 def keys() -> dict[str, Ed25519PrivateKey]:
     return {
         "merchant": load_or_create_key("merchant_wallet"),
         "agent": load_or_create_key("agent"),
         "supplier": load_or_create_key("supplier"),
+        "supplier_a": load_or_create_key("supplier_a"),
+        "supplier_b": load_or_create_key("supplier_b"),
+        "supplier_c": load_or_create_key("supplier_c"),
     }
 
 

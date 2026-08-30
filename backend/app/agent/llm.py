@@ -9,6 +9,13 @@ from __future__ import annotations
 from app.config import settings
 
 
+def llm_provider_name() -> str:
+    """Actual provider used (or 'mock' when no live key / forced mock)."""
+    if settings.llm_available:
+        return settings.agent_llm_provider
+    return "mock"
+
+
 class Negotiation:
     def __init__(self, quantity: int, reasoning: str, provider: str):
         self.quantity = quantity

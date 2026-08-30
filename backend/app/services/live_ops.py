@@ -29,6 +29,7 @@ from app.products import (
     limits_for,
 )
 from app.services import approvals, reserve_pay, warehouse
+from app.services.revenue_risk import AGENT_LEAD_WINDOW_S
 from app.services.sales_sim import SalesSim
 from app.services.velocity_engine import (
     COOLDOWN_SECONDS,
@@ -40,7 +41,22 @@ TICK_SECONDS = 0.5
 TICKER_WINDOW_S = 10.0
 FIVEMIN_WINDOW_S = 300.0
 
-_STEP_INDEX = {"pre_compute": 1, "detect": 2, "negotiate": 3, "gate": 4, "execute": 5, "escalate": 5, "finish": 6}
+_STEP_INDEX = {
+    "pre_compute": 1,
+    "detect": 2,
+    "calculate_risk": 3,
+    "evaluate_economics": 4,
+    "search_supplier": 5,
+    "negotiate": 6,
+    "gate": 7,
+    "execute": 8,
+    "do_not_buy": 8,
+    "escalate": 8,
+    "reconcile": 9,
+    "measure": 10,
+    "learn": 11,
+    "finish": 12,
+}
 
 
 class LiveOps:
@@ -231,6 +247,8 @@ class LiveOps:
 
     async def _run_pipeline(self, trigger: dict):
         sku = trigger["sku"]
+        velocity = trigger.get("velocityAtTrigger") or 0.0
+        stock_now = warehouse.stock_levels().get(sku, 0)
         async def on_update(node: str, data: dict) -> None:
             idx = _STEP_INDEX.get(node)
             payload: dict = {"type": "trigger_update", "trigger": trigger}
@@ -247,23 +265,50 @@ class LiveOps:
                 reset_inventory=False,
                 limits=limits_for(sku),
                 staged=True,
+                velocity_units_per_min=velocity or max(stock_now * 60.0 / (AGENT_LEAD_WINDOW_S / 2.0), 0.1),
                 portfolio=self._portfolio_ctx(exclude_sku=sku),
                 trigger_reason=trigger["reason"],
                 on_update=on_update,
             )
             blocked = summary["status"] == "blocked"
             trigger["outcome"] = "escalated" if blocked else "executed"
-            trigger["amountInr"] = round((summary.get("cart", {}).get("credentialSubject", {}) or {}).get("total_inr", 0.0), 2)
+            trigger["amountInr"] = round((summary.get("cart", {}) or {}).get("credentialSubject", {}).get("total_inr", 0.0), 2)
             trigger["quantity"] = summary.get("quantity")
+            trigger["orderId"] = summary.get("order_id")
+            trigger["razorpayBackend"] = (summary.get("execution") or {}).get("razorpay_backend")
+            trigger["supplierId"] = (summary.get("negotiation") or {}).get("supplier_id")
+            trigger["supplierAction"] = (summary.get("negotiation") or {}).get("action")
             trigger["paymentId"] = (summary.get("capture_result") or {}).get("id")
             trigger["escalationId"] = summary.get("escalation_id")
             trigger["paymentLink"] = summary.get("payment_link")
+            trigger["decisionId"] = summary.get("decision_id")
+            trigger["revenueRisk"] = summary.get("revenue_risk")
             trigger["mandates"] = {
                 "intent": summary.get("intent"),
                 "cart": summary.get("cart"),
                 "payment": summary.get("payment_mandate"),
             }
             trigger["gate"] = summary.get("gate")
+
+            # Closed loop: simulation mode synthesizes the Razorpay webhook
+            # through the same verification path so the trigger completes with a
+            # MATCHED reconciliation record.
+            decision_id = summary.get("decision_id")
+            if summary.get("status") == "executed" and decision_id:
+                from app.config import settings as _settings
+                from app.services import webhooks as _wh
+
+                amount = round((summary.get("execution") or {}).get("amount_inr") or 0.0, 2)
+                if _settings.execution_mode != "remote_test" and amount > 0:
+                    try:
+                        _wh.simulate_webhook(decision_id=decision_id, amount_inr=amount)
+                    except Exception:
+                        pass
+                from app.services import reconciliation as _rec
+
+                summary["reconciliation"] = _rec.get_by_decision(decision_id)
+                trigger["reconciliation"] = summary["reconciliation"]
+
             if blocked and summary.get("escalation_id"):
                 self._escalation_id_by_sku[sku] = summary["escalation_id"]
             self._cooldown_until[sku] = self._clock() + COOLDOWN_SECONDS
