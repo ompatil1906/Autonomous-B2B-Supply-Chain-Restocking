@@ -24,7 +24,7 @@ export function DemoDrawer({
   live: LiveModel;
   onRun: (scenario: string, overrideQuantity?: number) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
 
   const skus = live.products.length ? live.products.map((p) => p.sku) : ["SKU-404", "SKU-101", "SKU-203"];
@@ -60,7 +60,7 @@ export function DemoDrawer({
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-float transition hover:-translate-y-0.5"
+        className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-full shadow-float transition hover:-translate-y-0.5 cursor-pointer"
         style={{ background: C.surface, border: `1px solid ${C.hair}`, color: C.textHi }}
       >
         <FlaskConical size={15} color={C.brass} />
@@ -78,7 +78,7 @@ export function DemoDrawer({
         <div className="text-[11px] font-bold tracking-widest" style={{ color: C.textMuted }}>
           DEMO SCENARIOS
         </div>
-        <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-slate-100" aria-label="Close">
+        <button onClick={() => setIsOpen(false)} className="p-1 rounded hover:bg-slate-100 cursor-pointer" aria-label="Close">
           <X size={14} style={{ color: C.textLo }} />
         </button>
       </div>
@@ -88,8 +88,8 @@ export function DemoDrawer({
           <button
             onClick={toggleFestival}
             disabled={busy !== null}
-            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50"
-            style={{ background: C.redDim, color: C.red, border: `1px solid rgba(220,38,38,0.35)` }}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold disabled:opacity-50 cursor-pointer"
+            style={{ background: C.redDim, color: C.red, border: `1px solid rgba(220,38,38,0.35)`, cursor: busy !== null ? "not-allowed" : "pointer" }}
           >
             <Square size={13} fill="currentColor" />
             {busy === "stop" ? "Stopping…" : "Stop festival drop"}
@@ -100,8 +100,8 @@ export function DemoDrawer({
             key={s.id}
             disabled={busy !== null}
             onClick={() => pick(s.id)}
-            className="w-full text-left px-3 py-2.5 rounded-lg transition-colors disabled:opacity-50 hover:bg-slate-50"
-            style={{ background: C.raised }}
+            className="w-full text-left px-3 py-2.5 rounded-lg transition-colors disabled:opacity-50 hover:bg-slate-50 cursor-pointer"
+            style={{ background: C.raised, cursor: busy !== null ? "not-allowed" : "pointer" }}
           >
             <span className="flex items-center gap-2 text-xs font-semibold" style={{ color: C.textHi }}>
               {busy === s.id ? (

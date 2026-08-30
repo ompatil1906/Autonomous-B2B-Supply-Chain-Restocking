@@ -98,6 +98,38 @@ def daily_summary() -> dict:
         }
 
 
+def replenish_daily_block(ceiling_inr: float) -> ReserveBlock:
+    """Operator-initiated reset of the shared daily reserve block.
+
+    The previous block is left intact (with its unspent balance recorded) and a
+    freshly-funded block is opened for the day. An audit event makes the manual
+    action truthful — a real NPCI Reserve Pay block would be unwound/refunded;
+    here the reset is a deliberate operator action, never an in-memory rewrite.
+    """
+    global _daily_block_id
+    with _lock:
+        previous = _blocks.get(_daily_block_id) if _daily_block_id else None
+        from datetime import date
+
+        block = ReserveBlock(
+            f"rbp_daily_{date.today().isoformat()}_{uuid.uuid4().hex[:6]}",
+            ceiling_inr,
+            "DAILY-PORTFOLIO-CAP",
+        )
+        _blocks[block.block_id] = block
+        _daily_block_id = block.block_id
+        append(
+            "reserve_pay.reset",
+            {
+                "previous_block_id": previous.block_id if previous else None,
+                "unspent_at_reset_inr": round(previous.remaining_inr, 2) if previous else None,
+                "new_reserved_inr": ceiling_inr,
+                "simulated": settings.razorpay_mode != "remote",
+            },
+        )
+        return block
+
+
 def get_block(block_id: str) -> ReserveBlock | None:
     return _blocks.get(block_id)
 

@@ -200,6 +200,17 @@ async def reserve() -> dict:
     return {"blocks": [reserve_pay.to_dict(b) for b in reserve_pay.active_blocks()]}
 
 
+@app.post("/api/reserve/reset", dependencies=[Depends(require_writer_token)])
+async def reserve_reset() -> dict:
+    """Operator-initiated replenishment of the shared daily reserve pool.
+
+    Money-consequential → authenticated with X-Warden-Token. Opens a freshly
+    funded block and records the manual reset in the audit journal.
+    """
+    block = reserve_pay.replenish_daily_block(settings.ap2_daily_ceiling_inr)
+    return {"block": reserve_pay.to_dict(block), "summary": reserve_pay.daily_summary()}
+
+
 @app.get("/api/audit")
 async def audit() -> dict:
     return {"records": read_all()}

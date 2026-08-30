@@ -460,3 +460,27 @@ export interface LiveState {
   serverTimeMs: number;
   dailyCeilingRupees: number;
 }
+
+// ---- Notifications ----
+export type NotificationSeverity = "info" | "success" | "warning" | "critical";
+export type NotificationKind =
+  | "run"
+  | "gate"
+  | "approval"
+  | "payment"
+  | "stock"
+  | "festival"
+  | "budget";
+
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  severity: NotificationSeverity;
+  title: string;
+  message: string;
+  /** dedupe / rate-limit key — a repeated event with the same key is dropped */
+  key: string;
+  tab: import("./nav").TabId;
+  tsMs: number;
+  read?: boolean;
+}

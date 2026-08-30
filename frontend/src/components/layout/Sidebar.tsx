@@ -9,12 +9,14 @@ export function Sidebar({
   pendingCount,
   skuCount,
   connected,
+  onHome,
 }: {
   activeTab: TabId;
   onTabSelect: (tab: TabId) => void;
   pendingCount: number;
   skuCount?: number;
   connected?: boolean;
+  onHome?: () => void;
 }) {
   const source = tokenSource();
   const tokenConfigured = source !== "inbuilt";
@@ -25,7 +27,11 @@ export function Sidebar({
     >
       {/* Brand / Logo Area */}
       <div className="h-[72px] flex items-center px-5 shrink-0 mt-4">
-        <button onClick={() => onTabSelect("overview")} aria-label="Warden home" className="flex items-center gap-3">
+        <button
+          onClick={() => (onHome ? onHome() : onTabSelect("overview"))}
+          aria-label="Warden home"
+          className="flex items-center gap-3 cursor-pointer"
+        >
           <img src="/logo/logo.svg" alt="Warden logo" className="h-9 object-contain" />
         </button>
       </div>

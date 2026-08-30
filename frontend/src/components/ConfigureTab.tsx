@@ -1,4 +1,5 @@
-import { Ban, CheckCircle2, IndianRupee, KeyRound, Settings2, ShieldCheck, Wallet, Zap, FileText } from "lucide-react";
+import { Ban, CheckCircle2, IndianRupee, KeyRound, RotateCcw, Settings2, ShieldCheck, Wallet, Zap, FileText } from "lucide-react";
+import { useState } from "react";
 import type { SystemStatus } from "../lib/types";
 import { C, inr } from "../lib/theme";
 import { fmtCompact } from "../lib/format";
@@ -11,6 +12,7 @@ export function ConfigureTab({
   ceiling,
   dailyCeiling,
   lowStockThreshold,
+  onResetPool,
 }: {
   status: SystemStatus | null;
   blockRef: string;
@@ -18,6 +20,7 @@ export function ConfigureTab({
   ceiling: number;
   dailyCeiling?: number;
   lowStockThreshold?: number;
+  onResetPool?: () => Promise<void>;
 }) {
   const pool = dailyCeiling ?? 100_000;
   const portfolio = status?.portfolio ?? [];
@@ -29,6 +32,23 @@ export function ConfigureTab({
     if (tokenSourceLabel === "stored") return "Saved in this browser";
     return "Inbuilt development/demo token";
   })() as string;
+  const [resetting, setResetting] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
+
+  const doReset = async () => {
+    if (!onResetPool || resetting) return;
+    if (!window.confirm("Replenish the shared daily reserve pool back to its full ceiling? This is a write authenticated with X-Warden-Token and is recorded in the audit trail.")) return;
+    setResetting(true);
+    setResetMsg(null);
+    try {
+      await onResetPool();
+      setResetMsg("Pool replenished — remaining reset to the full daily ceiling.");
+    } catch (e) {
+      setResetMsg(`Reset failed — ${String(e)}`);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const rows: [string, string][] = [
     ["SKU", `${status?.ap2_sku ?? "—"} — ${walkthroughName}`],
@@ -137,6 +157,24 @@ export function ConfigureTab({
                 </span>
               }
             />
+            {onResetPool && (
+              <>
+                <button
+                  onClick={doReset}
+                  disabled={resetting}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+                  style={{ background: C.raised, color: C.textHi, border: `1px solid ${C.hairStrong}` }}
+                >
+                  <RotateCcw size={14} style={{ color: C.brass }} />
+                  {resetting ? "Replenishing…" : "Reset reserve pool"}
+                </button>
+                {resetMsg && (
+                  <div className="text-[11px] leading-relaxed" style={{ color: resetMsg.startsWith("Reset failed") ? C.red : C.green }}>
+                    {resetMsg}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

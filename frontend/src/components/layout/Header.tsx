@@ -7,6 +7,7 @@ export function Header({
   wsState,
   mode,
   onHome,
+  notifBell,
 }: {
   title?: string;
   subtitle?: string;
@@ -14,6 +15,8 @@ export function Header({
   /** execution mode reported by the backend (/api/status) */
   mode?: string;
   onHome?: () => void;
+  /** optional notification bell (mounted by App with live store data) */
+  notifBell?: React.ReactNode;
 }) {
   const [time, setTime] = useState("");
 
@@ -82,6 +85,8 @@ export function Header({
             {wsState === "open" ? "Live" : wsState === "connecting" ? "Connecting…" : "Offline"}
           </span>
         </button>
+
+        {notifBell}
 
         <div className="w-px h-5" style={{ background: C.hairStrong }} />
 

@@ -60,6 +60,10 @@ export const api = {
   approvals: () =>
     get<{ pending: ApprovalRecord[]; resolved: ApprovalRecord[] }>("/api/approvals"),
   reserve: () => get<{ blocks: any[] }>("/api/reserve"),
+  resetReserve: () =>
+    post<{ block: any; summary: { block_id: string | null; ceilingRupees: number; spentRupees: number } }>(
+      "/api/reserve/reset",
+    ),
   approveApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/approve`),
   rejectApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/reject`),
   latest: () => get<{ latest: RunResult | null }>("/api/runs/latest"),

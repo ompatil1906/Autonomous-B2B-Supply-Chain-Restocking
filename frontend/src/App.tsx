@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./lib/api";
 import type {
   ApprovalRecord,
   AuditRecord,
   Inventory,
+  NotificationItem,
   RunResult,
   SystemStatus,
 } from "./lib/types";
@@ -24,7 +25,12 @@ import { RestockPipelineScreen } from "./components/RestockPipelineScreen";
 import { SuppliersScreen } from "./components/SuppliersScreen";
 import { PaymentsScreen } from "./components/PaymentsScreen";
 import { LandingPage } from "./components/LandingPage";
+import { NotificationBell } from "./components/layout/NotificationBell";
+import { ToastStack } from "./components/notification/ToastStack";
+import { AlertModal } from "./components/notification/AlertModal";
 import { useLive } from "./hooks/useLive";
+import { useNotifications, type NotifyInput } from "./hooks/useNotifications";
+import { notificationsForEvent } from "./lib/notify";
 
 export default function App() {
   const [showIntro, setShowIntro] = useState(true);
@@ -44,6 +50,10 @@ export default function App() {
   const ceiling = status?.ap2_limit_inr ?? 10_000;
   const pendingCount = approvalsList.filter((a) => a.status === "pending").length;
 
+  const notifs = useNotifications();
+  const namesRef = useRef<Record<string, string>>({});
+  const knownPending = useRef<Set<string>>(new Set());
+
   const refresh = useCallback(async () => {
     const [s, inv, aud, appr, res] = await Promise.all([
       api.status(),
@@ -54,6 +64,7 @@ export default function App() {
     ]);
     setStatus(s);
     setInventory(inv);
+    namesRef.current = Object.fromEntries(inv.catalog.map((p) => [p.sku, p.name]));
     setAudit(aud.records.slice().reverse()); // newest-first for feeds
     setApprovalsList([...appr.pending, ...appr.resolved]);
     const blocks = res.blocks ?? [];
@@ -63,13 +74,49 @@ export default function App() {
     }
   }, []);
 
-  // one socket feeds everything — Live Ops model + mission console + approvals badge
+  const openNotif = useCallback(
+    (item: NotificationItem) => {
+      notifs.markRead(item.id);
+      setTab(item.tab);
+    },
+    [notifs.markRead],
+  );
+
+  // one socket feeds everything — Live Ops model + mission console + toasts + bell
   const handleWsEvent = useCallback(
     (e: any) => {
       if (e.type === "node") setLiveNode(e.node);
       if (e.type === "approval_updated" || e.type === "run_completed") refresh().catch(console.error);
+
+      for (const n of notificationsForEvent(e, { names: namesRef.current })) {
+        notifs.notify(n);
+      }
+
+      // the WS approval event carries no payload — diff pending ids fetched live
+      if (e.type === "approval_updated") {
+        api
+          .approvals()
+          .then((r) => {
+            const ids = new Set(r.pending.map((p) => p.id));
+            for (const p of r.pending) {
+              if (!knownPending.current.has(p.id)) {
+                const n: NotifyInput = {
+                  kind: "approval",
+                  severity: "warning",
+                  title: "Approval required",
+                  message: `${namesRef.current[p.sku] ?? p.sku} · ${(p as any).total_inr !== undefined ? `₹${(p as any).total_inr.toLocaleString("en-IN")}` : ""} awaits your sign-off.`,
+                  key: `approval:${p.id}`,
+                  tab: "approvals",
+                };
+                notifs.notify(n);
+              }
+            }
+            knownPending.current = ids;
+          })
+          .catch(() => {});
+      }
     },
-    [refresh],
+    [refresh, notifs.notify],
   );
 
   const live = useLive(handleWsEvent);
@@ -149,6 +196,7 @@ export default function App() {
   const headerInfo = getHeaderInfo(tab);
 
   return (
+    <>
     <div className="flex h-screen overflow-hidden" style={{ background: C.bg }}>
       <Sidebar
         activeTab={tab}
@@ -156,6 +204,7 @@ export default function App() {
         pendingCount={pendingCount}
         skuCount={live.products.length}
         connected={live.connected}
+        onHome={() => setShowIntro(true)}
       />
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
@@ -165,6 +214,15 @@ export default function App() {
           wsState={wsState}
           mode={status?.razorpay_execution_mode}
           onHome={() => setShowIntro(true)}
+          notifBell={
+            <NotificationBell
+              items={notifs.items}
+              unseen={notifs.unseen}
+              onMarkAllRead={notifs.markAllRead}
+              onMarkRead={notifs.markRead}
+              onNavigate={openNotif}
+            />
+          }
         />
 
         <TabBar activeTab={tab} onTabSelect={setTab} pendingCount={pendingCount} />
@@ -229,6 +287,12 @@ export default function App() {
                 ceiling={ceiling}
                 dailyCeiling={status?.ap2_daily_ceiling_inr}
                 lowStockThreshold={inventory?.catalog.find((s) => s.sku === status?.ap2_sku)?.reorder_threshold}
+                onResetPool={async () => {
+                  const res = await api.resetReserve();
+                  setReserveRemaining(res.block.remaining_inr);
+                  setBlockRef(res.block.block_id.toUpperCase());
+                  refresh().catch(console.error);
+                }}
               />
             )}
           </div>
@@ -237,6 +301,12 @@ export default function App() {
 
       <DemoDrawer live={live} onRun={run} />
     </div>
+
+    <ToastStack toasts={notifs.toasts} onDismiss={notifs.dismissToast} onOpen={openNotif} />
+    {notifs.critical && (
+      <AlertModal item={notifs.critical} onAcknowledge={notifs.acknowledgeCritical} onNavigate={openNotif} />
+    )}
+    </>
   );
 }
 
