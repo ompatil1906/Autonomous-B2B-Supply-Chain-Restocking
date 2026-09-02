@@ -7,7 +7,7 @@ import { C, inr } from "../lib/theme";
 import { StatusBadge } from "./ui/StatusBadge";
 import { EmptyState } from "./ui/EmptyState";
 import { ErrorState } from "./ui/ErrorState";
-import { SkeletonRow } from "./ui/Skeleton";
+import { Skeleton } from "./ui/Skeleton";
 import { DecisionEvidence } from "./DecisionEvidence";
 
 interface PipelineRow {
@@ -67,13 +67,19 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
   const reconsByDecision = new Map(recons.map((r) => [r.decision_id, r]));
   const productName = (sku: string) => live.products.find((p) => p.sku === sku)?.name ?? sku;
 
+  // A live trigger already carries the latest state for a decision — drop the
+  // overlapping persisted row so each decision appears exactly once.
+  const liveDecisionIds = new Set(
+    live.triggers.filter((t) => t.decisionId).map((t) => t.decisionId),
+  );
+
   const triggerRows: PipelineRow[] = live.triggers.map((t) => {
     const rec = t.reconciliation;
     const executedClear = t.outcome === "executed" && (rec?.state === "RECONCILED" || rec?.state === "MATCHED");
     const money = rec?.actual_amount_inr ?? t.amountInr ?? 0;
     return {
       key: `t:${t.id}`,
-      tsMs: t.triggeredAtMs,
+      tsMs: t.completedAtMs ?? t.triggeredAtMs,
       sku: t.sku,
       name: productName(t.sku),
       reason: t.reason.replace(/_/g, " "),
@@ -97,10 +103,22 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
     };
   });
 
-  const decisionRows: PipelineRow[] = decisions.map((d) => {
+  const decisionRows: PipelineRow[] = decisions
+    .filter((d) => !liveDecisionIds.has(d.decision_id))
+    .map((d) => {
     const rec = reconsByDecision.get(d.decision_id);
-    const base = d.action === "DO_NOT_BUY" || d.action === "WAIT";
-    const unit = base ? null : d.unit_price_inr ?? null;
+    const base = ["DO_NOT_BUY", "WAIT", "ESCALATE"].includes(d.action);
+    const unit = base
+      ? null
+      : d.unit_price_inr ?? (d.procurement_cost_inr && d.quantity ? d.procurement_cost_inr / d.quantity : null);
+    const total = base ? 0 : d.total_inr ?? d.procurement_cost_inr ?? null;
+    const moneyMoved =
+      base
+        ? 0
+        : rec && (rec.state === "RECONCILED" || rec.state === "MATCHED")
+          ? rec.actual_amount_inr ?? null
+          : null;
+    const blocked = d.action === "DO_NOT_BUY" || d.action === "ESCALATE";
     return {
       key: `d:${d.decision_id}`,
       tsMs: d.created_at ? new Date(d.created_at).getTime() : 0,
@@ -110,23 +128,18 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
       qty: base ? null : d.quantity,
       action: d.action,
       unitPrice: unit,
-      total: base ? 0 : d.total_inr ?? null,
-      moneyMoved:
-        d.action === "DO_NOT_BUY" || d.action === "WAIT"
-          ? 0
-          : rec && (rec.state === "RECONCILED" || rec.state === "MATCHED")
-            ? rec.actual_amount_inr ?? null
-            : null,
+      total,
+      moneyMoved,
       verified: rec
         ? {
             state: rec.state,
             detail: rec.state === "RECONCILED" || rec.state === "MATCHED" ? rec.events.length ? `webhook · ${rec.events.length} event(s)` : "reconciled" : "awaiting webhook",
           }
-        : d.action === "DO_NOT_BUY"
-          ? { state: "BLOCKED", detail: "gate failed — no money moved" }
+        : blocked
+          ? { state: "BLOCKED", detail: "no money moved" }
           : null,
       decisionId: d.decision_id,
-      status: d.action === "DO_NOT_BUY" ? "BLOCKED" : d.action,
+      status: blocked ? "BLOCKED" : d.action,
       inFlight: false,
     };
   });
@@ -136,7 +149,7 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
     .sort((a, b) => b.tsMs - a.tsMs)
     .slice(0, 60);
 
-  const blockedCount = rows.filter((r) => r.action === "DO_NOT_BUY" || r.status === "BLOCKED").length;
+  const blockedCount = rows.filter((r) => r.action === "DO_NOT_BUY" || r.action === "ESCALATE" || r.status === "BLOCKED").length;
   const inFlightCount = rows.filter((r) => r.inFlight).length;
 
   return (
@@ -179,7 +192,7 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
             </thead>
             <tbody>
               {!loaded &&
-                Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={7} />)}
+                Array.from({ length: 5 }).map((_, i) => <tr key={i}><td colSpan={8}><Skeleton className="h-4 w-full my-3" /></td></tr>)}
               {loaded && rows.length === 0 && (
                 <tr>
                   <td colSpan={8} className="p-5">
@@ -192,7 +205,7 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
                 </tr>
               )}
               {rows.map((r) => {
-                const isBlocked = r.action === "DO_NOT_BUY" || r.status === "BLOCKED";
+                const isBlocked = r.action === "DO_NOT_BUY" || r.action === "ESCALATE" || r.status === "BLOCKED";
                 return (
                   <tr
                     key={r.key}
@@ -243,7 +256,7 @@ export function RestockPipelineScreen({ live }: { live: LiveModel }) {
                       )}
                     </td>
                     <td className="px-5 py-3">
-                      <StatusBadge status={r.inFlight ? r.status : isBlocked ? "BLOCKED" : r.action} />
+                      <StatusBadge status={r.status === "executed" ? "executed" : r.inFlight ? r.status : isBlocked ? "BLOCKED" : r.action} />
                     </td>
                   </tr>
                 );

@@ -68,6 +68,22 @@ def get_decision(decision_id: str) -> dict | None:
     return None
 
 
+def update_decision(decision_id: str, patch: dict) -> dict | None:
+    """Merge `patch` into an existing decision (identified by decision_id).
+
+    Used to enrich a decision with the negotiated pricing once the cart/mandate
+    resolves — it keeps ONE row per decision and never duplicates history.
+    """
+    with _lock:
+        items = _load(DECISIONS_FILE)
+        for d in items:
+            if d.get("decision_id") == decision_id:
+                d.update(patch)
+                _save(DECISIONS_FILE, items)
+                return dict(d)
+    return None
+
+
 def record_outcome(outcome: dict) -> dict:
     outcome = dict(outcome)
     outcome.setdefault("created_at", _now())
@@ -107,3 +123,10 @@ def summary() -> dict:
             sum(float(d.get("revenue_at_risk_inr") or 0.0) for d in items), 2
         ),
     }
+
+
+def clear() -> None:
+    with _lock:
+        for f in (DECISIONS_FILE, OUTCOMES_FILE):
+            if os.path.exists(f):
+                os.remove(f)

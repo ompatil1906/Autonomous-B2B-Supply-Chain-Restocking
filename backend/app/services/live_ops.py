@@ -254,6 +254,14 @@ class LiveOps:
             payload: dict = {"type": "trigger_update", "trigger": trigger}
             if idx is not None:
                 trigger["currentStep"] = idx
+            # The restock physically lands the moment the execute node succeeds
+            # (warehouse.apply_restock inside node_execute). Flip the pipeline to
+            # "executed" then so the status/time match the live inventory update
+            # instead of lagging until the remaining staged nodes finish.
+            if node == "execute" and data.get("capture_result") and trigger["outcome"] == "in_progress":
+                trigger["outcome"] = "executed"
+                trigger["completedAtMs"] = self._wall_ms()
+                payload["executed"] = True
             if node == "gate" and data.get("gate"):
                 payload["gate"] = data["gate"]
             await self._broadcast(payload)
@@ -319,7 +327,15 @@ class LiveOps:
         finally:
             self._pending_cost.pop(sku, None)
             self._tasks.pop(sku, None)
+            # Record when the restock actually finished (stock already landed via
+            # warehouse.apply_restock inside the same run), so the pipeline Time can
+            # match the moment inventory reflects it. If already stamped at the
+            # execute node, keep that earlier (inventory-synced) timestamp.
+            trigger.setdefault("completedAtMs", self._wall_ms())
             await self._broadcast({"type": "trigger_update", "trigger": trigger})
+            # Let the frontend reconcile authoritative HTTP state (ledger/audit,
+            # inventory, pipeline) for ambient restocks — not just manual runs.
+            await self._broadcast({"type": "run_completed", "scenario": "happy", "sku": sku})
 
     # ----------------------------------------------------------------- festival
     async def start_festival(self, delay_s: float = 10.0) -> dict:
@@ -348,6 +364,40 @@ class LiveOps:
         self.sim.stop_festival()
         self.festival_drop_at_ms = None
         await self._broadcast({"type": "festival_stopped"})
+
+    async def reset(self) -> None:
+        """Full system reset for a fresh demo session (landing page → dashboard).
+
+        Stops live demand, cancels in-flight pipelines, clears every piece of
+        in-memory Live Ops state, then restarts ambient demand so the sim runs
+        again for the new visitor. Persisted stores are cleared separately in
+        main.py.
+        """
+        # Stop the sim's background loops (ambient + festival).
+        self.sim.stop_festival()
+        for t in list(self._bg_tasks):
+            t.cancel()
+        self._bg_tasks.clear()
+        for t in list(self._tasks.values()):
+            t.cancel()
+        self._tasks.clear()
+
+        # Reset in-memory Live Ops state.
+        self.launched_at_ms = {}
+        self.triggers = []
+        self._cooldown_until = {}
+        self._escalation_id_by_sku = {}
+        self._pending_cost = {}
+        self._sales_log.clear()
+        self.festival_drop_at_ms = None
+        self.engine.reset()
+        reserve_pay.reset_shared()
+
+        # Restart ambient demand for the fresh session.
+        await self._broadcast({"type": "system_reset"})
+        self.sim.start_ambient()
+        if not any(t.done() for t in self._bg_tasks):
+            self._bg_tasks.append(asyncio.create_task(self._tick_loop()))
 
     def force_trigger(self, sku: str) -> dict | None:
         """Dev-panel probe: push any visible SKU through the same gated pipeline."""

@@ -90,6 +90,25 @@ async def test_hallucinated_quantity_is_blocked_by_gate():
 
 
 @pytest.mark.asyncio
+async def test_persisted_decision_carries_negotiated_pricing():
+    """The restock pipeline must show unit price + total truthfully, so the
+    persisted decision (initially recorded pre-supplier) is backfilled with the
+    negotiated cart pricing when the run completes."""
+    from app.services import decisions as decisions_store
+
+    result = await run_agent(scenario="happy")
+    assert result["status"] == "executed"
+
+    persisted = decisions_store.get_decision(result["decision_id"])
+    assert persisted is not None
+    assert persisted["action"] == "BUY"
+    assert persisted["total_inr"] == pytest.approx(9800.0)
+    assert persisted["unit_price_inr"] == pytest.approx(98.0)  # 9800 / 100 units
+    assert persisted["quantity"] == 100
+    assert persisted["supplier_id"]
+
+
+@pytest.mark.asyncio
 async def test_audit_trail_is_append_only_and_chained():
     result = await run_agent(scenario="happy")
     records = read_all()
@@ -125,3 +144,25 @@ async def test_audit_trail_is_append_only_and_chained():
     assert cart["credentialSubject"]["prev_mandate_id"] == intent["id"]
     assert payment["credentialSubject"]["prev_mandate_id"] == cart["id"]
     assert payment["credentialSubject"]["payment_id"] == result["capture_result"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_reconciliation_matures_to_matched_at_capture():
+    """Option B: an executed restock must yield a MATCHED reconciliation (money
+    genuinely moved via the reserve-block debit) rather than a stale PENDING —
+    even before any webhook, and regardless of execution_mode."""
+    from app.services import reconciliation as reconciliation_store
+
+    result = await run_agent(scenario="happy")
+    assert result["status"] == "executed"
+
+    decision_id = result["decision_id"]
+    rec = reconciliation_store.get_by_decision(decision_id)
+    assert rec is not None
+    assert rec["state"] == "MATCHED"
+    assert rec["actual_amount_inr"] == pytest.approx(
+        (result.get("cart") or {}).get("credentialSubject", {}).get("total_inr")
+    )
+    assert rec["expected_amount_inr"] == pytest.approx(rec["actual_amount_inr"])
+    assert "capture.confirmed" in rec["events"]
+    assert rec["payment_id"] == result["capture_result"]["id"]

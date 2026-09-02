@@ -427,6 +427,7 @@ export interface AgentTrigger {
   sku: string;
   reason: TriggerReason;
   triggeredAtMs: number;
+  completedAtMs?: number;
   stockAtTrigger: number;
   velocityAtTrigger: number;
   predictedSecondsAtTrigger: number | null;

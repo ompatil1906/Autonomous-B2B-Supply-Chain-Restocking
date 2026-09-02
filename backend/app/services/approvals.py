@@ -154,3 +154,9 @@ def list_all() -> dict:
     pending.reverse()
     resolved.reverse()
     return {"pending": pending, "resolved": resolved}
+
+
+def clear() -> None:
+    with _lock:
+        if os.path.exists(APPROVALS_FILE):
+            os.remove(APPROVALS_FILE)

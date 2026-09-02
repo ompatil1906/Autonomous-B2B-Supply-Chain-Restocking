@@ -82,6 +82,30 @@ def get_by_decision(decision_id: str) -> dict | None:
     return next((r for r in reversed(items) if r["decision_id"] == decision_id), None)
 
 
+def mark_matched(decision_id: str, amount_inr: float, payment_id: str | None, reason: str = "capture.confirmed") -> dict | None:
+    """Finalize a reconciliation record as MATCHED at capture-commit time.
+
+    The capture leg has already succeeded and the reserve block was debited
+    before this runs, so marking MATCHED here reflects authoritative truth (money
+    genuinely moved) rather than waiting on a webhook that may never arrive in a
+    local/test-mode demo. A later real webhook, if any, idempotently re-confirms
+    the same state/amount — no double count.
+    """
+    with _lock:
+        items = _load()
+        rec = next((r for r in reversed(items) if r["decision_id"] == decision_id), None)
+        if rec is None:
+            return None
+        rec["actual_amount_inr"] = round(float(amount_inr), 2)
+        rec["state"] = "MATCHED"
+        rec["payment_id"] = payment_id or rec.get("payment_id")
+        if reason not in rec["events"]:
+            rec["events"].append(reason)
+        rec["updated_at"] = _now()
+        _save(items)
+        return rec
+
+
 def match_event(decision_id: str, event: dict) -> dict | None:
     """Advance the record based on a webhook event (amount_paid vs expected)."""
     with _lock:
@@ -110,3 +134,9 @@ def list_all(limit: int = 100) -> dict:
         items = _load()
     items.reverse()
     return {"reconciliations": items[:limit]}
+
+
+def clear() -> None:
+    with _lock:
+        if os.path.exists(RECONCILIATIONS_FILE):
+            os.remove(RECONCILIATIONS_FILE)

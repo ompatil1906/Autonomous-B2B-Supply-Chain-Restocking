@@ -114,3 +114,9 @@ def list_events(limit: int = 100) -> list[dict]:
         events = _load()
     events.reverse()
     return events[:limit]
+
+
+def clear() -> None:
+    with _lock:
+        if os.path.exists(WEBHOOK_EVENTS_FILE):
+            os.remove(WEBHOOK_EVENTS_FILE)

@@ -13,12 +13,22 @@ from pydantic import BaseModel, Field
 
 from app.agent.graph import run_agent, normalize_scenario
 from app.agent.llm import llm_provider_name
+from app.audit import clear as clear_audit
 from app.audit import read_all, verify_chain
 from app.auth import require_writer_token
 from app.config import settings
 from app.products import PRODUCTS
 from app.services import approvals as approvals_store
-from app.services import decisions, outcomes, reconciliation, reserve_pay, warehouse
+from app.services import (
+    decisions,
+    execution,
+    idempotency,
+    outcomes,
+    reconciliation,
+    reserve_pay,
+    warehouse,
+    webhook_store,
+)
 from app.services import webhooks as webhook_svc
 from app.services.live_ops import LiveOps
 from app.services.razorpay_mcp import RazorpayMcpClient
@@ -123,16 +133,19 @@ async def _run_scenario(req: RunRequest) -> dict:
         raise exc
 
     # Closed loop: in simulation mode the Razorpay webhook is synthesized with the
-    # SAME signature path so the reconciliation record visibly matures to MATCHED.
+    # SAME signature path so the reconciliation record (already MATCHED at capture
+    # commit) is re-confirmed. In remote_test the reconciliation is already MATCHED
+    # from the authoritative capture, so we still surface it to the result.
     decision_id = result.get("decision_id")
-    if result.get("status") == "executed" and decision_id and settings.execution_mode != "remote_test":
-        amount = round((result.get("execution") or {}).get("amount_inr") or 0.0, 2)
-        if amount > 0:
-            try:
-                webhook_svc.simulate_webhook(decision_id=decision_id, amount_inr=amount)
-                result["reconciliation"] = reconciliation.get_by_decision(decision_id)
-            except Exception as exc:
-                result.setdefault("webhook_error", str(exc)[:120])
+    if result.get("status") == "executed" and decision_id:
+        if settings.execution_mode != "remote_test":
+            amount = round((result.get("execution") or {}).get("amount_inr") or 0.0, 2)
+            if amount > 0:
+                try:
+                    webhook_svc.simulate_webhook(decision_id=decision_id, amount_inr=amount)
+                except Exception as exc:
+                    result.setdefault("webhook_error", str(exc)[:120])
+        result["reconciliation"] = reconciliation.get_by_decision(decision_id)
 
     _runs.append(result)
     _persist_last_run(result)
@@ -209,6 +222,35 @@ async def reserve_reset() -> dict:
     """
     block = reserve_pay.replenish_daily_block(settings.ap2_daily_ceiling_inr)
     return {"block": reserve_pay.to_dict(block), "summary": reserve_pay.daily_summary()}
+
+
+@app.post("/api/system/reset", dependencies=[Depends(require_writer_token)])
+async def system_reset() -> dict:
+    """Full demo reset — wipe every runtime artifact and restart the live sim.
+
+    Called from the landing page the moment a new visitor hits "Go to
+    Dashboard", so each fresh session starts on a clean slate: empty ledger,
+    no decisions/approvals/reconciliations/webhooks/executions/learning, reseeded
+    warehouse, and a zero-spend daily reserve pool. Authenticated with
+    X-Warden-Token because it destroys persisted state.
+    """
+    global _runs
+    await live.reset()
+    warehouse.reset()
+    reserve_pay.reset_shared()
+    clear_audit()
+    approvals_store.clear()
+    decisions.clear()
+    reconciliation.clear()
+    webhook_store.clear()
+    execution.clear()
+    idempotency.clear()
+    outcomes.clear_learned()
+    if os.path.exists(LAST_RUN_FILE):
+        os.remove(LAST_RUN_FILE)
+    _runs = []
+    _load_last_run()
+    return {"reset": True}
 
 
 @app.get("/api/audit")

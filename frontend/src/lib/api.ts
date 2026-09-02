@@ -64,6 +64,7 @@ export const api = {
     post<{ block: any; summary: { block_id: string | null; ceilingRupees: number; spentRupees: number } }>(
       "/api/reserve/reset",
     ),
+  systemReset: () => post<{ reset: boolean }>("/api/system/reset"),
   approveApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/approve`),
   rejectApproval: (id: string) => post<ApprovalRecord>(`/api/approvals/${id}/reject`),
   latest: () => get<{ latest: RunResult | null }>("/api/runs/latest"),

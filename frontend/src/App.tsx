@@ -53,8 +53,10 @@ export default function App() {
   const notifs = useNotifications();
   const namesRef = useRef<Record<string, string>>({});
   const knownPending = useRef<Set<string>>(new Set());
+  const refreshSeq = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = ++refreshSeq.current;
     const [s, inv, aud, appr, res] = await Promise.all([
       api.status(),
       api.inventory(),
@@ -62,6 +64,8 @@ export default function App() {
       api.approvals(),
       api.reserve(),
     ]);
+    // ignore stale/out-of-order responses — only the latest request wins
+    if (seq !== refreshSeq.current) return;
     setStatus(s);
     setInventory(inv);
     namesRef.current = Object.fromEntries(inv.catalog.map((p) => [p.sku, p.name]));
@@ -86,7 +90,8 @@ export default function App() {
   const handleWsEvent = useCallback(
     (e: any) => {
       if (e.type === "node") setLiveNode(e.node);
-      if (e.type === "approval_updated" || e.type === "run_completed") refresh().catch(console.error);
+      if (e.type === "approval_updated" || e.type === "run_completed" || e.type === "system_reset")
+        refresh().catch(console.error);
 
       for (const n of notificationsForEvent(e, { names: namesRef.current })) {
         notifs.notify(n);
@@ -138,8 +143,32 @@ export default function App() {
     return () => clearInterval(check);
   }, [refresh]);
 
+  // Always show current audit data the moment the Ledger is opened — even if
+  // WS run_completed events were missed (e.g. while disconnected), so the table
+  // never appears empty while the server-side chain has entries.
+  useEffect(() => {
+    if (tab !== "ledger") return;
+    api
+      .audit()
+      .then((a) => setAudit(a.records.slice().reverse()))
+      .catch(() => {});
+  }, [tab]);
+
+  const enterDashboard = () => {
+    setShowIntro(false);
+    api
+      .systemReset()
+      .then(() => {
+        refresh().catch(() => {});
+        // clear the WS-fed live model (products/triggers/festival) immediately so
+        // the reset is visible on first entry, not after a manual reload.
+        live.refresh().catch(() => {});
+      })
+      .catch(() => {});
+  };
+
   if (showIntro) {
-    return <LandingPage onComplete={() => setShowIntro(false)} />;
+    return <LandingPage onComplete={enterDashboard} />;
   }
 
   const run = (scenario: string, overrideQuantity?: number) => {

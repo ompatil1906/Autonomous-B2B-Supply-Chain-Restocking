@@ -103,6 +103,10 @@ export function useLive(onEvent?: (e: any) => void): LiveModel {
         setFestivalActive(false);
         setFestivalDropAtMs(null);
         break;
+      case "system_reset":
+        // re-pull authoritative state; clears stale products/triggers/festival
+        refresh();
+        break;
     }
     onEventRef.current?.(e);
   }, []);

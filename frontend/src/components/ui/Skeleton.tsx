@@ -26,6 +26,20 @@ export function SkeletonRow({ cols = 5 }: { cols?: number }) {
   );
 }
 
+/** Table-valid skeleton row — renders a real <tr> with skeleton <td> cells,
+ * which the div-based SkeletonRow cannot do inside a <tbody>. */
+export function TableSkeletonRow({ cells = 8 }: { cells?: number }) {
+  return (
+    <tr className="border-t" style={{ borderColor: C.hair }}>
+      {Array.from({ length: cells }).map((_, i) => (
+        <td key={i} className="px-5 py-3">
+          <Skeleton className="h-3 w-20" />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 export function SkeletonChart() {
   return (
     <div className="flex flex-col gap-3 h-56">

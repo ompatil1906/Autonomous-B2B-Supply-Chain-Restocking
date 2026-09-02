@@ -81,6 +81,20 @@ def get_or_create_daily_block(ceiling_inr: float) -> ReserveBlock:
         return block
 
 
+def reset_shared() -> None:
+    """Tear down the in-memory reserve pool for a full demo reset.
+
+    Unlike `replenish_daily_block` (which keeps the old block and opens a fresh
+    one with an audit trail), this discards all in-memory blocks so the next
+    session starts with zero spend against a clean daily cap. The audit journal
+    is itself cleared by the full system reset.
+    """
+    global _daily_block_id
+    with _lock:
+        _blocks.clear()
+        _daily_block_id = None
+
+
 def daily_summary() -> dict:
     """DailyBudget for the wire; zeroed shape before any run today."""
     with _lock:

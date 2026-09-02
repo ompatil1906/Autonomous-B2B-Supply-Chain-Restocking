@@ -588,6 +588,29 @@ async def node_finish(state: AgentState) -> dict:
     if negotiation and negotiation.get("cart") is not None:
         negotiation = {**negotiation, "cart": mandate_to_json(negotiation["cart"])}
     cart = state.get("cart")
+    # Backfill the negotiated pricing onto the persisted decision so the restock
+    # pipeline can show unit price / total truthfully (they only resolve AFTER
+    # the economic decision is first recorded, during supplier search/negotiation).
+    patch = {"unit_price_inr": None, "total_inr": None}
+    if cart is not None and hasattr(cart, "credentialSubject"):
+        cs = cart.credentialSubject
+        qty = (state.get("quantity") or 0) or 0
+        total = round(cs.total_inr, 2) if cs.total_inr else 0.0
+        unit = round(total / qty, 2) if qty else None
+        patch = {
+            "unit_price_inr": unit,
+            "total_inr": total,
+            "quantity": qty,
+            "supplier_id": (state.get("negotiation") or {}).get("supplier_id"),
+        }
+    elif (state.get("negotiation") or {}).get("cart") is not None:
+        cs = state["negotiation"]["cart"].credentialSubject
+        total = round(cs.total_inr, 2) if cs.total_inr else 0.0
+        qty = state.get("quantity") or 0
+        patch["unit_price_inr"] = round(total / qty, 2) if qty else None
+        patch["total_inr"] = total
+    if patch.get("total_inr"):
+        decisions.update_decision(state["decision_id"], patch)
     summary = {
         **{
             "status": state["status"],

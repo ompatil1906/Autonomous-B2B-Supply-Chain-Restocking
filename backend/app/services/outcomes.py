@@ -92,3 +92,8 @@ def update_learning(summary: dict) -> None:
     os.makedirs(os.path.dirname(LEARNED_FILE), exist_ok=True)
     with open(LEARNED_FILE, "w", encoding="utf-8") as fh:
         json.dump(prev, fh, ensure_ascii=False, indent=1)
+
+
+def clear_learned() -> None:
+    if os.path.exists(LEARNED_FILE):
+        os.remove(LEARNED_FILE)

@@ -70,6 +70,12 @@ def _persist_execution(result: dict) -> None:
         pass
 
 
+def clear() -> None:
+    """Remove the rendezvous execution file so the Razorpay activity tab rests empty."""
+    if os.path.exists(EXECUTIONS_FILE):
+        os.remove(EXECUTIONS_FILE)
+
+
 class ExecutionCoordinator:
     def __init__(self) -> None:
         self.client = RazorpayMcpClient()
@@ -208,6 +214,17 @@ class ExecutionCoordinator:
                 expected_amount_inr=round(amount_inr, 2),
                 order_id=order_id,
             )
+
+            # The capture leg already succeeded and the reserve block was debited
+            # above, so the reconciliation is truthfully MATCHED at commit time —
+            # the money genuinely moved. (A later Razorpay webhook, if any, only
+            # re-confirms the same state/amount.)
+            if execution.status == "CAPTURED":
+                rec = reconciliation.mark_matched(
+                    decision_id,
+                    amount_inr=amount_inr,
+                    payment_id=capture.get("id") or payment_id,
+                ) or rec
 
             result = execution.model_dump()
             result["payment_mandate"] = pm.model_dump()

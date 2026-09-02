@@ -70,6 +70,20 @@ export function notificationsForEvent(e: any, ctx: { names: Record<string, strin
 
     case "trigger_update": {
       const t = e.trigger as any;
+      if (t?.outcome === "executed") {
+        const money = t?.amountInr;
+        return [
+          {
+            kind: "run",
+            severity: "success",
+            title: "Automated Restock Executed",
+            message: `${skuName(ctx.names, t?.sku)} · ${t?.quantity ?? 0} units${money ? ` · ${inr(money)} moved` : ""}.`,
+            key: `trigger:done:${t?.id}`,
+            tab: "pipeline",
+          },
+        ];
+      }
+
       if (t?.outcome !== "escalated" && t?.outcome !== "failed") return [];
       const gateRejected = e.gate && e.gate.passed === false;
       return [
@@ -141,17 +155,9 @@ export function notificationsForEvent(e: any, ctx: { names: Record<string, strin
       ];
 
     case "festival_launched":
-      return [
-        {
-          kind: "festival",
-          severity: "critical",
-          title: "Demand crash under way",
-          message: "Sales jumped far above forecast — watch inventory and gate decisions closely.",
-          key: "festival:launch",
-          tab: "live",
-          critical: true,
-        },
-      ];
+      // No popup for the demand surge itself — surfacing only the outcomes
+      // (successful automated restocks) keeps the drop window calm and honest.
+      return [];
 
     case "festival_stopped":
       return [

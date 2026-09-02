@@ -56,7 +56,10 @@ export function RestockPipeline({ triggers, products, onOpenLedger }: { triggers
               activeTriggers.map((t, i) => {
                 const product = products.find(p => p.sku === t.sku);
                 const name = product ? product.name : t.sku;
-                const time = new Date(t.triggeredAtMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // Show the moment the restock actually completed/landed (matching
+                // the live inventory update); fall back to trigger time in-flight.
+                const tMs = t.completedAtMs ?? t.triggeredAtMs;
+                const time = new Date(tMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 
                 return (
                   <tr key={i} className="hover:bg-slate-50">
