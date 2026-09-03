@@ -22,7 +22,7 @@
 
 ## 🎥 Demo
 
-<video src="./demo/Warden%20Demo.mp4" width="100%" controls></video>
+https://github.com/ompatil1906/Warden/raw/main/demo/Warden%20Demo.mp4
 
 ---
 
