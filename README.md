@@ -20,6 +20,12 @@
 
 ---
 
+## 🎥 Demo
+
+<video src="./demo/Warden%20Demo.mp4" width="100%" controls></video>
+
+---
+
 ## 🏆 Razorpay Buildathon Submission
 
 **Warden** is an autonomous B2B purchasing agent that protects revenue from high-velocity stockouts — while proving every rupee it moves on Razorpay's rails.
