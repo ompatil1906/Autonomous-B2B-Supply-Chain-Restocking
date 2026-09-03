@@ -39,17 +39,23 @@ It is explicitly built for the **Razorpay Buildathon Track 1: AI Growth & Agenti
 
 ## 🔁 The Closed Loop
 
-```text
-live sales velocity ──► revenue-at-risk machine ──► economic decision (BUY/WAIT/ESCALATE)
-        ▲                                                        │
-        │                                                        ▼
-stock grows ◄── warehouse apply_restock ◄── capture ◄── gate ◄── supplier negotiation (best bound)
-                                                  │
-                                                  ▼
-                      Razorpay webhook (HMAC-verified) ──► reconciliation MATCHED
-                                                  │
-                                                  ▼
-                             outcome measured → supplier reliability learning
+```mermaid
+graph TD
+    V["Live Sales Velocity"] --> R["Revenue-at-Risk Machine"]
+    R --> D["Economic Decision (BUY/WAIT/ESCALATE)"]
+    
+    D --> S["Supplier Negotiation (best bound)"]
+    S --> G["Gate"]
+    G --> C["Capture"]
+    
+    C --> W["Warehouse apply_restock"]
+    W --> Stock["Stock Grows"]
+    Stock -.-> V
+    
+    C --> WH["Razorpay Webhook (HMAC-verified)"]
+    WH --> Recon["Reconciliation MATCHED"]
+    WH --> Out["Outcome Measured"]
+    Out --> Learn["Supplier Reliability Learning"]
 ```
 
 Every executed run opens a **reconciliation record**; the first `payment.captured` webhook whose amount equals the expected payout advances it PENDING → **MATCHED**. Mismatches become MISMATCH / REQUIRES_REVIEW, and the paid amount is fed back as the agent's reliability signal for next time.
