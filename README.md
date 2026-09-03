@@ -58,7 +58,8 @@ Every executed run opens a **reconciliation record**; the first `payment.capture
 
 ## ❌ The Problem & ✅ The Solution
 
-In high-velocity commerce, stockouts are immediate revenue loss. But handing an AI agent the keys to a bank account is catastrophic: LLMs hallucinate, suppliers price-gouge, and ordinary APIs carry no cryptographic authority for agents.
+> [!CAUTION]
+> In high-velocity commerce, stockouts are immediate revenue loss. But handing an AI agent the keys to a bank account is catastrophic: LLMs hallucinate, suppliers price-gouge, and ordinary APIs carry no cryptographic authority for agents.
 
 Warden's answer:
 
@@ -89,34 +90,42 @@ Three pillars:
 
 ### Every money leg is tagged with truth
 
-Legs are never labelled by configuration — they are labelled by what *actually happened* (`simulated` = local deterministic simulator stood in; `test` = a genuine Razorpay test-mode object was created via remote MCP). With no credentials, the whole rail degrades cleanly to the simulator with distinct tags, and the audit log remains irrefutable.
+> [!IMPORTANT]
+> Legs are never labelled by configuration — they are labelled by what *actually happened* (`simulated` = local deterministic simulator stood in; `test` = a genuine Razorpay test-mode object was created via remote MCP). With no credentials, the whole rail degrades cleanly to the simulator with distinct tags, and the audit log remains irrefutable.
 
 ---
 
 ## 🧭 Agent Pipeline (LangGraph) (`graph.py`)
 
-```text
-pre_compute → detect → calculate_risk → evaluate_economics
-                                              │
-       finish ◄───(WAIT / no spend)───────────┤
-                                              │
-                                        (BUY) ▼
-                                        search_supplier
-                                              │
-                                              ▼
-        escalate (payment link) ◄───── negotiate
-                                              │
-                                              ▼
-          do_not_buy (₹0 moved) ◄───── gate (intent caps)
-                                              │
-                                     (passed) ▼
-                                           execute (Razorpay leg)
-                                              │
-                                              ▼
-   finish ◄── learn ◄── measure ◄── reconcile (webhook match)
+```mermaid
+graph TD
+    A[pre_compute] --> B[detect]
+    B --> C[calculate_risk]
+    C --> D[evaluate_economics]
+    
+    D -- "WAIT (no spend)" --> Z[finish]
+    D -- "BUY" --> E[search_supplier]
+    
+    E --> F[negotiate]
+    
+    F -- "no viable quote" --> Esc["escalate (payment link)"]
+    Esc --> Z
+    
+    F --> G[gate]
+    
+    G -- "blocked by intent caps" --> DNB["do_not_buy (₹0 moved)"]
+    DNB --> Z
+    
+    G -- "passed" --> H["execute (Razorpay leg)"]
+    
+    H --> I["reconcile (webhook match)"]
+    I --> J[measure]
+    J --> K[learn]
+    K --> Z
 ```
 
-**Deterministic Safety**: The LLM appears only in `search_supplier` (advisory strategy) and `negotiate` (explanation). Every critical decision — `calculate_risk`, `evaluate_economics`, `negotiate` limits, `gate` logic, and `execute` (`ExecutionCoordinator`) — is pure deterministic code that **CANNOT** be influenced by the LLM. That is the mathematical guarantee that the merchant can never lose more than the signed IntentMandate bound, no matter how the LLM hallucinates or what input it receives.
+> [!IMPORTANT]
+> **Deterministic Safety**: The LLM appears only in `search_supplier` (advisory strategy) and `negotiate` (explanation). Every critical decision — `calculate_risk`, `evaluate_economics`, `negotiate` limits, `gate` logic, and `execute` (`ExecutionCoordinator`) — is pure deterministic code that **CANNOT** be influenced by the LLM. That is the mathematical guarantee that the merchant can never lose more than the signed IntentMandate bound, no matter how the LLM hallucinates or what input it receives.
 
 In `mock` mode the whole pipeline runs offline-deterministic (the default for tests); with `AGENT_LLM_PROVIDER=gemini` the same pipeline runs live with the LLM acting purely as a smart narrator and advisor.
 
@@ -136,19 +145,17 @@ The engine keeps a sliding 30s window of sales per SKU to compute true live dema
 
 ## 🛠️ Tech Stack Architecture
 
-```text
-React Dashboard (Vite + TypeScript + TailwindCSS v4)
-   │  REST + WebSocket (real-time telemetry & node-by-node pipeline streaming)
-   ▼
-FastAPI Backend (backend/app)
-   ├─ agent/    LangGraph orchestration (graph.py pipeline + llm.py advisory)
-   ├─ ap2/      Mandate models, per-identity Ed25519 signer, deterministic gate
-   ├─ services/ core engines: revenue_risk, negotiation, velocity, live_ops
-   │            execution: razorpay_mcp, reserve_pay, idempotency, webhooks, reconciliation
-   ├─ models/   Pydantic schemas for Intent/Cart mandates and financial ledgers
-   ├─ audit.py  Append-only hash-chained ledger (tamper-evident)
-   ├─ auth.py   Warden bearer-token guard on every money endpoint
-   └─ main.py   REST endpoints + live WebSocket broadcast + LiveOps orchestrator
+```mermaid
+graph TD
+    Client["💻 React Dashboard (Vite + TypeScript + Tailwind v4)"]
+    
+    Client -- "REST + WebSocket (real-time telemetry & streaming)" --> API["⚡ FastAPI Backend (backend/app)"]
+    
+    API --- Agent["🧠 agent/ (LangGraph orchestration: pipeline + LLM advisory)"]
+    API --- AP2["🔒 ap2/ (Mandate models, Ed25519 signer, deterministic gate)"]
+    API --- Services["⚙️ services/ (Core engines: revenue_risk, velocity... Execution: razorpay_mcp...)"]
+    API --- Models["📦 models/ (Pydantic schemas for Intent/Cart mandates)"]
+    API --- Core["📜 main.py, audit.py, auth.py (REST, Tamper-evident Ledger)"]
 ```
 
 ---
@@ -179,7 +186,8 @@ RAZORPAY_WEBHOOK_SECRET=warden-sim-only-secret   # must equal the webhook secret
 WARDEN_API_TOKEN=warden-dev-token                # sent as X-Warden-Token on money routes
 ```
 
-*`remote_test` calls the real Razorpay MCP in test mode (Order/Payment Link/capture tool calls); with no credentials it falls back to the simulator with explicit `simulated` leg tags so the demo never breaks.*
+> [!NOTE]
+> `remote_test` calls the real Razorpay MCP in test mode (Order/Payment Link/capture tool calls); with no credentials it falls back to the simulator with explicit `simulated` leg tags so the demo never breaks.
 
 ### 3. Run
 
@@ -192,8 +200,9 @@ make run-frontend     # http://localhost:5173
 
 POST `/api/run`, `/api/approvals/{id}/approve|reject`, `/api/festival/*`, `/api/live/probe/*`,
 `/api/webhooks/simulate` require `X-Warden-Token: <WARDEN_API_TOKEN>`.
-`POST /api/webhooks/razorpay` is **not** bearer-protected — it is signature-protected
-(`X-Razorpay-Signature: HMAC-SHA256(secret, raw_body)`) exactly like a real Razorpay delivery.
+
+> [!WARNING]
+> `POST /api/webhooks/razorpay` is **not** bearer-protected — it is signature-protected (`X-Razorpay-Signature: HMAC-SHA256(secret, raw_body)`) exactly like a real Razorpay delivery.
 
 ---
 
@@ -226,7 +235,7 @@ uv run python scripts/demo.py --scenario rogue_ai --json
 
 ## 🔌 API Surface (highlights)
 
-```
+```http
 GET  /api/status            agent charter, portfolio, suppliers, execution mode
 GET  /api/inventory         live stock with predicted time-to-stockout
 GET  /api/reserve           view active daily Reserve Pay blocks
