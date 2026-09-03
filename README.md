@@ -62,10 +62,10 @@ In high-velocity commerce, stockouts are immediate revenue loss. But handing an 
 
 Warden's answer:
 
-- **Revenue framing** — a deterministic machine turns live velocity into `revenue_at_risk`, `contribution_at_risk`, and a `protection_spend_ratio`, so spend is justified in the merchant's own terms.
+- **Revenue Risk Calculation (`revenue_risk.py`)** — a deterministic machine calculates `units_per_minute` (over a 30s sliding window) and projects demand inside a 90s replenishment window. It outputs `revenue_at_risk`, `contribution_at_risk` (based on ~45% blended gross margin), and a `protection_spend_ratio`, ensuring spend is strictly justified by avoided losses.
 - **Bounded money** — the agent can only ever move money inside a pre-signed financial boundary (`IntentMandate`): SKUs, quantity caps, unit price ceilings, total budget, expiry, and a daily portfolio ceiling.
-- **Supplier competition** — three real suppliers, each with its own Ed25519 identity. If the incumbent gouges the price above the merchant cap, the agent *switches suppliers autonomously* (or escalates only when no eligible quote exists).
-- **Proof on Razorpay rails** — execution anchors a Razorpay **Order** whose proof-notes carry the full Warden mandate chain hash; captured amounts reconcile back through a **webhook**; both are rendered in the Receipts tab.
+- **Best Supplier Check (`negotiation.py` & `suppliers.py`)** — quotes are fetched from multiple suppliers, each with an Ed25519 identity, reliability score, lead time, and MOQ. The deterministic policy ensures incumbent stability, but if the incumbent gouges prices above the cap (`max_unit_price_inr`) or its risk-adjusted lead time fails the 90s window, the agent *switches suppliers autonomously* or reduces the cart quantity to fit the limits.
+- **Proof & Idempotency on Razorpay rails (`execution.py`)** — execution anchors a Razorpay **Order** whose proof-notes carry the full Warden mandate chain hash. Razorpay leg semantics accurately tag states (simulated/test), and idempotency guarantees exactly-once execution. Captured amounts reconcile back through a signature-verified **webhook**; both are rendered in the Receipts tab.
 
 ---
 
@@ -93,33 +93,44 @@ Legs are never labelled by configuration — they are labelled by what *actually
 
 ---
 
-## 🧭 Agent Pipeline (LangGraph)
+## 🧭 Agent Pipeline (LangGraph) (`graph.py`)
 
 ```text
 pre_compute → detect → calculate_risk → evaluate_economics
-   │                                              │
-   │                                      BUY ──► search_supplier → negotiate → gate
-   │                                              │                            │
-   └── WAIT (no spend)                     multi   │                     passed ──► execute
-                                            eval   │                            │
-                                                    │                     blocked ──► do_not_buy ◄── hostile gates
-                                                    └── no viable quote ──► escalate (payment link + WhatsApp)
-                                                    
-execute → reconcile (open record) → measure (contribution protected) → learn (supplier reliability) → finish
+                                              │
+       finish ◄───(WAIT / no spend)───────────┤
+                                              │
+                                        (BUY) ▼
+                                        search_supplier
+                                              │
+                                              ▼
+        escalate (payment link) ◄───── negotiate
+                                              │
+                                              ▼
+          do_not_buy (₹0 moved) ◄───── gate (intent caps)
+                                              │
+                                     (passed) ▼
+                                           execute (Razorpay leg)
+                                              │
+                                              ▼
+   finish ◄── learn ◄── measure ◄── reconcile (webhook match)
 ```
 
-The LLM is advisory: it may propose strategy (`llm_strategy_statement`) and is told to *attempt* the requested lot, but every boundary decision is deterministic code. In `mock` mode the whole pipeline runs offline-deterministic (the default for tests); with `AGENT_LLM_PROVIDER=gemini` the same pipeline runs live.
+**Deterministic Safety**: The LLM appears only in `search_supplier` (advisory strategy) and `negotiate` (explanation). Every critical decision — `calculate_risk`, `evaluate_economics`, `negotiate` limits, `gate` logic, and `execute` (`ExecutionCoordinator`) — is pure deterministic code that **CANNOT** be influenced by the LLM. That is the mathematical guarantee that the merchant can never lose more than the signed IntentMandate bound, no matter how the LLM hallucinates or what input it receives.
+
+In `mock` mode the whole pipeline runs offline-deterministic (the default for tests); with `AGENT_LLM_PROVIDER=gemini` the same pipeline runs live with the LLM acting purely as a smart narrator and advisor.
 
 ---
 
-## ⚡ Predictive Trigger Engine + Velocity
+## ⚡ Predictive Trigger Engine + Velocity (`velocity_engine.py`)
 
-The engine keeps a sliding 30s window of sales per SKU:
+The engine keeps a sliding 30s window of sales per SKU to compute true live demand:
 
-- `predicted_seconds_to_stockout = stock / (units/min) × 60`
-- a trigger fires when the prediction enters the **90s lead time**, or stock hits the hard floor of 3 units;
-- hysteresis + cooldown guarantee exactly one pipeline per SKU at a time;
-- festival curves (Marathi: *Masan & Ganesh*) inject demand surges that the revenue machine must quantify.
+- `units_per_minute = (window_qty / 30.0) * 60`
+- `predicted_seconds_to_stockout = stock / units_per_minute * 60`
+- A SKU is marked `critical` and triggers the agent pipeline when the prediction enters the **90s lead time** (`TRIGGER_LEAD_TIME_SECONDS`), ensuring enough runway for a full restock cycle.
+- A hard floor of 3 units acts as a safety net. Hysteresis and a 15s cooldown guarantee exactly one pipeline per SKU at a time.
+- Festival curves (Marathi: *Masan & Ganesh*) inject demand surges that the revenue machine must quickly quantify and react to.
 
 ---
 
@@ -130,13 +141,14 @@ React Dashboard (Vite + TypeScript + TailwindCSS v4)
    │  REST + WebSocket (real-time telemetry & node-by-node pipeline streaming)
    ▼
 FastAPI Backend (backend/app)
-   ├─ agent/    LangGraph orchestration (12-node pipeline + run/limit/portfolio context)
-   ├─ ap2/      Mandate models, per-identity Ed25519 signer, deterministic gate (17 checks)
-   ├─ services/ revenue_risk, negotiation, suppliers, identity, execution, webhooks,
-   │            reconciliation, outcomes, idempotency, razorpay_mcp, live_ops, velocity
+   ├─ agent/    LangGraph orchestration (graph.py pipeline + llm.py advisory)
+   ├─ ap2/      Mandate models, per-identity Ed25519 signer, deterministic gate
+   ├─ services/ core engines: revenue_risk, negotiation, velocity, live_ops
+   │            execution: razorpay_mcp, reserve_pay, idempotency, webhooks, reconciliation
+   ├─ models/   Pydantic schemas for Intent/Cart mandates and financial ledgers
    ├─ audit.py  Append-only hash-chained ledger (tamper-evident)
    ├─ auth.py   Warden bearer-token guard on every money endpoint
-   └─ main.py   REST endpoints + live WebSocket broadcast
+   └─ main.py   REST endpoints + live WebSocket broadcast + LiveOps orchestrator
 ```
 
 ---
@@ -217,19 +229,23 @@ uv run python scripts/demo.py --scenario rogue_ai --json
 ```
 GET  /api/status            agent charter, portfolio, suppliers, execution mode
 GET  /api/inventory         live stock with predicted time-to-stockout
-GET  /api/revenue-risk      latest revenue-at-risk analysis
-GET  /api/decisions         decision ledger
+GET  /api/reserve           view active daily Reserve Pay blocks
+
 GET  /api/audit             tamper-evident mandate chain
 GET  /api/audit/verify      full-hash chain validation
+GET  /api/revenue-risk      latest revenue-at-risk analysis
+GET  /api/decisions         decision ledger
 GET  /api/reconciliations   decision ↔ Razorpay payment matching state
-GET  /api/webhooks/events   every webhook received + its verdict
-GET  /api/razorpay/activity Orders / captures / links / webhooks in one view
 POST /api/run               run a scenario          [auth]
+POST /api/approvals/{id}/approve mint a Razorpay payment link fallback [auth]
+GET  /api/razorpay/activity Orders / captures / links / webhooks in one view
+GET  /api/razorpay/live-proof all real/simulated Razorpay objects (Receipts tab)
 POST /api/webhooks/razorpay Razorpay delivery entry (signature-verified)
-POST /api/webhooks/simulate synthesise a signed demo webhook   [auth]
+POST /api/webhooks/simulate synthesize a signed demo webhook   [auth]
 GET  /api/outcomes          what the agent learned (supplier reliability)
-GET  /api/suppliers         all three suppliers + their accounting
-ws   /ws                    node-by-node pipeline telemetry
+GET  /api/live/state        bootstrap snapshot for the Live Ops screen
+POST /api/festival/start    inject demand surges (Masan & Ganesh) [auth]
+ws   /ws                    node-by-node pipeline + LiveOps telemetry
 ```
 
 ---
